@@ -15,22 +15,22 @@ typedef u64      Object;
 // Type Tags for Objects
 enum Tag {
   // Tag-only types (no payload)
-  TAG_BROKEN_HEART,
   TAG_NIL,
   TAG_TRUE,
   TAG_FALSE,
 
   // Primitive Types
   TAG_FIXNUM,
-  TAG_BYTE,
   TAG_REAL32,
 
   // Reference Types (Payloads are indices into memory vectors)
-  TAG_PAIR,        // Memory: [ car, cdr ]
-  TAG_VECTOR,      // Memory: [ nObjects, obj0, obj1 ... ]
-  TAG_BYTE_VECTOR, // Memory: [ nBytes, byte0, byte1, ... ]
-  TAG_STRING,      // Memory: [ nBytes, byte0, byte1, ... ]
-  TAG_BIGNUM,      // Memory: ???
+  TAG_PAIR,
+  TAG_VECTOR,
+  TAG_BYTE_VECTOR,
+  TAG_STRING,
+
+  // GC Types (Types not directly accessible)
+  TAG_BROKEN_HEART,
 
   NUM_TAGS,
 };
@@ -48,7 +48,6 @@ b64 IsBrokenHeart(Object object);
 b64 IsFixnum(Object object);
 b64 IsTrue(Object object);
 b64 IsFalse(Object object);
-b64 IsByte(Object object);
 b64 IsReal32(Object object);
 b64 IsNil(Object object);
 b64 IsBoolean(Object object); 
@@ -56,12 +55,10 @@ b64 IsPair(Object object);
 b64 IsVector(Object object);
 b64 IsByteVector(Object object);
 b64 IsString(Object object);
-b64 IsBignum(Object object);
 
 // Construct boxed values given native C types
 Object BoxFixnum(s64 fixnum); // Truncates to 47 bits
 Object BoxBoolean(b64 boolean);
-Object BoxByte(u8 byte);
 Object BoxReal32(real32 value);
 Object BoxReal64(real64 value);
 // Construct referential data structures. References are indices.
@@ -69,13 +66,22 @@ Object BoxPair(u64 reference);
 Object BoxVector(u64 reference);
 Object BoxByteVector(u64 reference);
 Object BoxString(u64 reference);
-Object BoxBignum(u64 reference);
+// Box GC Types
+Object BoxBrokenHeart(u64 reference);
+
+extern Object nil;
+extern Object true;
+extern Object false;
 
 // Unbox from Object to native C types
 s64    UnboxFixnum(Object object); 
 b64    UnboxBoolean(Object object);
-u8     UnboxByte(Object object);
 real32 UnboxReal32(Object object);
 real64 UnboxReal64(Object object);
-// Unbox Pair, Vector, Byte Vector, String, and Bignum
-u64 UnboxReference (Object object);
+// Unbox Pair, Vector, Byte Vector, String
+u64 UnboxReference(Object object);
+// Unbox GC Types
+u64 UnboxBrokenHeart(Object object);
+
+// Function to run through tag tests.
+void TestTagged();

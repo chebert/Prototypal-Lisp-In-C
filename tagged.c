@@ -88,7 +88,6 @@ b64 IsBrokenHeart(Object object) { return HasTag(object, TAG_BROKEN_HEART); }
 b64 IsFixnum(Object object)      { return HasTag(object, TAG_FIXNUM); }
 b64 IsTrue(Object object)        { return HasTag(object, TAG_TRUE); }
 b64 IsFalse(Object object)       { return HasTag(object, TAG_FALSE); }
-b64 IsByte(Object object)        { return HasTag(object, TAG_BYTE); }
 b64 IsReal32(Object object)      { return HasTag(object, TAG_REAL32); }
 b64 IsNil(Object object)         { return HasTag(object, TAG_NIL); }
 b64 IsBoolean(Object object) {
@@ -103,24 +102,26 @@ b64 IsPair(Object object)        { return HasTag(object, TAG_PAIR); }
 b64 IsVector(Object object)      { return HasTag(object, TAG_VECTOR); }
 b64 IsByteVector(Object object)  { return HasTag(object, TAG_BYTE_VECTOR); }
 b64 IsString(Object object)      { return HasTag(object, TAG_STRING); }
-b64 IsBignum(Object object)      { return HasTag(object, TAG_BIGNUM); }
 
 Object TagPayload(u64 payload, enum Tag tag) {
   return TAGGED_OBJECT_MASK | SHIFT_LEFT(tag, TAG_SHIFT) | payload;
 }
 
+Object nil          = TAGGED_OBJECT_MASK | SHIFT_LEFT(TAG_NIL,          TAG_SHIFT);
+Object true         = TAGGED_OBJECT_MASK | SHIFT_LEFT(TAG_TRUE,         TAG_SHIFT);
+Object false        = TAGGED_OBJECT_MASK | SHIFT_LEFT(TAG_FALSE,        TAG_SHIFT);
+
 // TODO: Maintain sign when truncating?
 Object BoxFixnum(s64 fixnum)        { return TagPayload(PAYLOAD_MASK & fixnum, TAG_FIXNUM); }
 Object BoxBoolean(b64 boolean)      { return TagPayload(0, boolean ? TAG_TRUE : TAG_FALSE); }
-Object BoxByte(u8 byte)             { return TagPayload(byte,                  TAG_BYTE); }
 Object BoxReal32(real32 value)      { return TagPayload(Real32ToU32(value),    TAG_REAL32); }
 Object BoxPair(u64 reference)       { return TagPayload(reference, TAG_PAIR); }
 Object BoxVector(u64 reference)     { return TagPayload(reference, TAG_VECTOR); }
 Object BoxByteVector(u64 reference) { return TagPayload(reference, TAG_BYTE_VECTOR); }
 Object BoxString(u64 reference)     { return TagPayload(reference, TAG_STRING); }
-Object BoxBignum(u64 reference)     { return TagPayload(reference, TAG_BIGNUM); }
 
 Object BoxReal64(real64 value) { return Real64ToU64(value); }
+Object BoxBrokenHeart(u64 num_bytes) { return TagPayload(num_bytes, TAG_BROKEN_HEART); }
 
 s64 UnboxFixnum(Object object) {
   u64 sign_bit_mask = SHIFT_LEFT(1, TAG_SHIFT-1); 
@@ -132,17 +133,15 @@ s64 UnboxFixnum(Object object) {
     : (s64)(PAYLOAD_MASK & object);
 }
 
-b64    UnboxBoolean(Object object)   { return IsFalse(object) ? 0 : 1; }
-u8     UnboxByte(Object object)      { return (u8)(0xff & object); }
-real32 UnboxReal32(Object object)    { return U32ToReal32((u32)(0xffffffff & object)); }
-real64 UnboxReal64(Object object)    { return U64ToReal64(object); }
-u64    UnboxReference(Object object) { return (PAYLOAD_MASK & object); }
-
+b64    UnboxBoolean(Object object)     { return IsFalse(object) ? 0 : 1; }
+real32 UnboxReal32(Object object)      { return U32ToReal32((u32)(0xffffffff & object)); }
+real64 UnboxReal64(Object object)      { return U64ToReal64(object); }
+u64    UnboxReference(Object object)   { return (PAYLOAD_MASK & object); }
 
 // Just for testing.
 s64 TwosComplement(u64 value) { return (s64)(~value + 1); }
 
-int main(int argc, char** argv) {
+void TestTagged() {
   assert(NUM_TAGS < 16);
 
   assert(-1 == UnboxFixnum(BoxFixnum(-1)));
@@ -152,15 +151,9 @@ int main(int argc, char** argv) {
   assert( UnboxBoolean(BoxBoolean(1 == 1)));
   assert(!UnboxBoolean(BoxBoolean(1 != 1)));
 
-  assert(UnboxByte(BoxByte(0xBE)) == 0xBE);
-  assert(UnboxReference(BoxPair(42)) == 42);
-  
-  assert(IsByte(BoxByte(0xBE)));
   assert(IsPair(BoxPair(42)));
   assert(IsBoolean(BoxBoolean(1)));
 
-  assert(!IsByte(BoxPair(42)));
-  assert(!IsPair(BoxByte(0xBE)));
   assert(!IsBoolean(BoxReal32(3.14159f)));
 
   assert(UnboxReal32(BoxReal32(3.14159f)) == 3.14159f);
