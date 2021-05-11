@@ -3,48 +3,7 @@
 #include <string.h>
 #include <assert.h>
 
-#include "tagged.h"
-
-struct Memory {
-  Object *the_objects;
-  Object *new_objects;
-
-  u64 free;
-  Object root;
-  u64 max_objects;
-
-  u64 num_collections;
-  u64 num_objects_allocated;
-};
-
-// Allocate memory needed to store up to max_objects.
-struct Memory AllocateMemory(u64 max_objects);
-// Perform a compacting garbage collection on the objects in memory
-void CollectGarbage(struct Memory *memory);
-
-// Allocate a vector of objects.
-Object AllocateVector(struct Memory *memory, u64 num_objects);
-Object VectorRef(struct Memory *memory, u64 reference, u64 index);
-void VectorSet(struct Memory *memory, u64 reference, u64 index, Object value);
-
-// Allocate a vector of 8-bit bytes.
-Object AllocateByteVector(struct Memory *memory, u64 num_bytes);
-Object ByteVectorRef(struct Memory *memory, u64 reference, u64 index);
-void ByteVectorSet(struct Memory *memory, u64 reference, u64 index, u8 value);
-
-// Allocate a string of characters.
-Object AllocateString(struct Memory *memory, const char *string);
-
-// Allocate a pair of 2 objects.
-Object AllocatePair(struct Memory *memory, Object car, Object cdr);
-
-// Print an object, following references.
-void PrintObject(struct Memory *memory, Object object);
-// Print an object, following references, followed by a newline.
-void PrintlnObject(struct Memory *memory, Object object);
-// Print an object, not following references.
-void PrintReference(Object object);
-
+#include "memory.h"
 
 // Performs a garbage collection if there isn't enough memory.
 // If there still isn't enough memory, causes an exception.
@@ -341,6 +300,18 @@ Object AllocatePair(struct Memory *memory, Object car, Object cdr) {
   memory->num_objects_allocated += 2;
   // [ ..., car, cdr, free.. ]
   return BoxPair(new_reference);
+}
+Object Car(struct Memory *memory, u64 reference) {
+  return memory->the_objects[reference];
+}
+Object Cdr(struct Memory *memory, u64 reference) {
+  return memory->the_objects[reference + 1];
+}
+void SetCar(struct Memory *memory, u64 reference, Object value) {
+  memory->the_objects[reference] = value;
+}
+void SetCdr(struct Memory *memory, u64 reference, Object value) {
+  memory->the_objects[reference + 1] = value;
 }
 
 void PrintObject(struct Memory *memory, Object object) {

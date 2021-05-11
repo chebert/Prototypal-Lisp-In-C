@@ -1,3 +1,5 @@
+#ifndef TAGGED_H
+#define TAGGED_H
 #include <stdint.h>
 
 // Simpler type names
@@ -85,3 +87,4 @@ u64 UnboxBrokenHeart(Object object);
 
 // Function to run through tag tests.
 void TestTagged();
+#endif
