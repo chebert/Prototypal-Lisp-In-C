@@ -1,7 +1,19 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
-#include "tagged.h"
+#include "tag.h"
+
+// TODO: A garbage collector which has 2 live regions instead of 1
+//  - Large: contains large & old objects
+//  - Small: contains small & new objects
+// When the small runs out of memory, a collection occurs.
+//   Objects in the small region are moved to the large region.
+//   Objects in the large region are not moved.
+// When the large runs out of memory, a collection occurs.
+//   Objects in the large region are moved.
+// This is to reduce the size of moves, since most objects are short-lived and small.
+
+// TODO: Weak References
 
 struct Memory {
   // The live objects
@@ -20,6 +32,8 @@ struct Memory {
   u64 num_collections;
   // The total number of object allocations that have occurred
   u64 num_objects_allocated;
+  // The total number of objects that have been copied due to GCs.
+  u64 num_objects_moved;
 };
 
 // Allocate memory needed to store up to max_objects.

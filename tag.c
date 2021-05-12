@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "tagged.h"
+#include "tag.h"
 
 // Real64 Encodings
 // Normal Encoding:
@@ -141,7 +141,7 @@ u64    UnboxReference(Object object)   { return (PAYLOAD_MASK & object); }
 // Just for testing.
 s64 TwosComplement(u64 value) { return (s64)(~value + 1); }
 
-void TestTagged() {
+void TestTag() {
   assert(NUM_TAGS < 16);
 
   assert(-1 == UnboxFixnum(BoxFixnum(-1)));

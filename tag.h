@@ -1,5 +1,5 @@
-#ifndef TAGGED_H
-#define TAGGED_H
+#ifndef TAG_H
+#define TAG_H
 #include <stdint.h>
 
 // Simpler type names
@@ -30,6 +30,7 @@ enum Tag {
   TAG_VECTOR,
   TAG_BYTE_VECTOR,
   TAG_STRING,
+  // TODO: SYMBOL
 
   // GC Types (Types not directly accessible)
   TAG_BROKEN_HEART,
@@ -86,5 +87,5 @@ u64 UnboxReference(Object object);
 u64 UnboxBrokenHeart(Object object);
 
 // Function to run through tag tests.
-void TestTagged();
+void TestTag();
 #endif

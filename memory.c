@@ -37,6 +37,7 @@ void CollectGarbage(struct Memory *memory) {
     printf("CollectGarbage: Scanning object at %llu. Free=%llu\n", scan, memory->free);
     memory->new_objects[scan] = MoveObject(memory, memory->new_objects[scan]);
   }
+  memory->num_objects_moved += memory->free;
 
   // Flip
   Object *temp = memory->the_objects;
@@ -98,7 +99,7 @@ Object MoveObject(struct Memory *memory, Object object) {
   return 0;
 }
 
-Object MovePrimitive(Object object) { return object; }
+Object MovePrimitive(Object object) {return object; }
 
 // Move References
 Object MovePair(struct Memory *memory, u64 ref) {
@@ -210,6 +211,7 @@ struct Memory AllocateMemory(u64 max_objects) {
   memory.max_objects = max_objects;
   memory.num_collections = 0;
   memory.num_objects_allocated = 0;
+  memory.num_objects_moved = 0;
   u64 n_bytes = sizeof(Object)*memory.max_objects;
 
   memory.the_objects = (Object*)malloc(n_bytes);
@@ -321,8 +323,8 @@ void PrintObject(struct Memory *memory, Object object) {
   }
   switch (GetTag(object)) {
     case TAG_NIL:    printf("nil"); break;
-    case TAG_TRUE:   printf("true"); break;
-    case TAG_FALSE:  printf("false"); break;
+    case TAG_TRUE:   printf("#t"); break;
+    case TAG_FALSE:  printf("#f"); break;
     case TAG_FIXNUM: printf("%lld", UnboxFixnum(object)); break;
     case TAG_REAL32: printf("%ff", UnboxReal32(object)); break;
 
@@ -432,10 +434,23 @@ void TestMemory() {
   }
   printf("Root: ");
   PrintlnObject(&memory, memory.root);
-  printf("Allocated %llu objects, performed %llu garbage collections\n", memory.num_objects_allocated, memory.num_collections);
+  printf("Allocated %llu objects, performed %llu garbage collections, moved %llu objects,\n"
+      "on average: %llf objects allocated/collection, %llf objects moved/collection\n",
+      memory.num_objects_allocated, memory.num_collections, memory.num_objects_moved,
+      memory.num_objects_allocated * 1.0 / memory.num_collections,
+      memory.num_objects_moved * 1.0 / memory.num_collections);
+
+  memory.root = nil;
+  memory.root = AllocateVector(&memory, 31);
+  printf("Root: ");
+  PrintlnObject(&memory, memory.root);
+
+  memory.root = nil;
+  // NOTE: out of memory error
+  //memory.root = AllocateVector(&memory, 32);
 }
 
 int main(int argc, char** argv) {
-  TestTagged();
+  TestTag();
   TestMemory();
 }
