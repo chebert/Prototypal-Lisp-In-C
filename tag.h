@@ -30,7 +30,7 @@ enum Tag {
   TAG_VECTOR,
   TAG_BYTE_VECTOR,
   TAG_STRING,
-  // TODO: SYMBOL
+  TAG_SYMBOL,
 
   // GC Types (Types not directly accessible)
   TAG_BROKEN_HEART,
@@ -58,6 +58,7 @@ b64 IsPair(Object object);
 b64 IsVector(Object object);
 b64 IsByteVector(Object object);
 b64 IsString(Object object);
+b64 IsSymbol(Object object);
 
 // Construct boxed values given native C types
 Object BoxFixnum(s64 fixnum); // Truncates to 47 bits
@@ -69,6 +70,7 @@ Object BoxPair(u64 reference);
 Object BoxVector(u64 reference);
 Object BoxByteVector(u64 reference);
 Object BoxString(u64 reference);
+Object BoxSymbol(u64 reference);
 // Box GC Types
 Object BoxBrokenHeart(u64 reference);
 
@@ -81,7 +83,7 @@ s64    UnboxFixnum(Object object);
 b64    UnboxBoolean(Object object);
 real32 UnboxReal32(Object object);
 real64 UnboxReal64(Object object);
-// Unbox Pair, Vector, Byte Vector, String
+// Unbox Pair, Vector, Byte Vector, String, Symbol
 u64 UnboxReference(Object object);
 // Unbox GC Types
 u64 UnboxBrokenHeart(Object object);

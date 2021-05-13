@@ -43,6 +43,7 @@ void CollectGarbage(struct Memory *memory);
 
 // Allocate and access a vector of objects.
 Object AllocateVector(struct Memory *memory, u64 num_objects);
+s64 VectorLength(struct Memory *memory, u64 reference);
 Object VectorRef(struct Memory *memory, u64 reference, u64 index);
 void VectorSet(struct Memory *memory, u64 reference, u64 index, Object value);
 
@@ -53,6 +54,7 @@ void ByteVectorSet(struct Memory *memory, u64 reference, u64 index, u8 value);
 
 // Allocate a string of characters.
 Object AllocateString(struct Memory *memory, const char *string);
+Object AllocateSymbol(struct Memory *memory, const char *name);
 
 // Allocate a pair of 2 objects.
 Object AllocatePair(struct Memory *memory, Object car, Object cdr);
@@ -67,5 +69,7 @@ void PrintObject(struct Memory *memory, Object object);
 void PrintlnObject(struct Memory *memory, Object object);
 // Print an object, not following references.
 void PrintReference(Object object);
+
+void TestMemory();
 
 #endif

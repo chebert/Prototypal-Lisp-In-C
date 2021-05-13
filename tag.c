@@ -102,6 +102,7 @@ b64 IsPair(Object object)        { return HasTag(object, TAG_PAIR); }
 b64 IsVector(Object object)      { return HasTag(object, TAG_VECTOR); }
 b64 IsByteVector(Object object)  { return HasTag(object, TAG_BYTE_VECTOR); }
 b64 IsString(Object object)      { return HasTag(object, TAG_STRING); }
+b64 IsSymbol(Object object)      { return HasTag(object, TAG_SYMBOL); }
 
 Object TagPayload(u64 payload, enum Tag tag) {
   return TAGGED_OBJECT_MASK | SHIFT_LEFT(tag, TAG_SHIFT) | payload;
@@ -119,6 +120,7 @@ Object BoxPair(u64 reference)       { return TagPayload(reference, TAG_PAIR); }
 Object BoxVector(u64 reference)     { return TagPayload(reference, TAG_VECTOR); }
 Object BoxByteVector(u64 reference) { return TagPayload(reference, TAG_BYTE_VECTOR); }
 Object BoxString(u64 reference)     { return TagPayload(reference, TAG_STRING); }
+Object BoxSymbol(u64 reference)     { return TagPayload(reference, TAG_SYMBOL); }
 
 Object BoxReal64(real64 value) { return Real64ToU64(value); }
 Object BoxBrokenHeart(u64 num_bytes) { return TagPayload(num_bytes, TAG_BROKEN_HEART); }

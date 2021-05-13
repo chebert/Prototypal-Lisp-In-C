@@ -67,6 +67,7 @@ Object MoveVector(struct Memory *memory, u64 ref);
 // Returns an index into the array where the blob was moved to.
 u64 MoveBlob(struct Memory *memory, u64 ref);
 Object MoveString(struct Memory *memory, u64 ref);
+Object MoveSymbol(struct Memory *memory, u64 ref);
 Object MoveByteVector(struct Memory *memory, u64 ref);
 
 // Returns ceiling(numerator/denominator)
@@ -91,6 +92,7 @@ Object MoveObject(struct Memory *memory, Object object) {
     // Reference Objects
     case TAG_PAIR:        return       MovePair(memory, UnboxReference(object));
     case TAG_STRING:      return     MoveString(memory, UnboxReference(object));
+    case TAG_SYMBOL:      return     MoveSymbol(memory, UnboxReference(object));
     case TAG_VECTOR:      return     MoveVector(memory, UnboxReference(object));
     case TAG_BYTE_VECTOR: return MoveByteVector(memory, UnboxReference(object));
   }
@@ -171,6 +173,7 @@ u64 MoveBlob(struct Memory *memory, u64 ref) {
 }
 
 Object MoveString(struct Memory *memory, u64 ref)     { return BoxString(MoveBlob(memory, ref)); }
+Object MoveSymbol(struct Memory *memory, u64 ref)     { return BoxSymbol(MoveBlob(memory, ref)); }
 Object MoveByteVector(struct Memory *memory, u64 ref) { return BoxByteVector(MoveBlob(memory, ref)); }
 
 Object MoveVector(struct Memory *memory, u64 ref) {
@@ -247,12 +250,15 @@ Object AllocateVector(struct Memory *memory, u64 num_objects) {
   return BoxVector(new_reference);
 }
 
+s64 VectorLength(struct Memory *memory, u64 reference) {
+  return UnboxFixnum(memory->the_objects[reference]);
+}
 Object VectorRef(struct Memory *memory, u64 reference, u64 index) {
-  assert(index < UnboxFixnum(memory->the_objects[reference]));
+  assert(index < VectorLength(memory, reference));
   return memory->the_objects[reference+1 + index];
 }
 void VectorSet(struct Memory *memory, u64 reference, u64 index, Object value) {
-  assert(index < UnboxFixnum(memory->the_objects[reference]));
+  assert(index < VectorLength(memory, reference));
   memory->the_objects[reference+1 + index] = value;
 }
 u64 AllocateBlob(struct Memory *memory, u64 num_bytes) {
@@ -291,6 +297,9 @@ Object AllocateString(struct Memory *memory, const char *string) {
   u64 new_reference = AllocateBlob(memory, num_bytes);
   memcpy(&memory->the_objects[new_reference + 1], string, num_bytes);
   return BoxString(new_reference);
+}
+Object AllocateSymbol(struct Memory *memory, const char *name) {
+  return BoxSymbol(UnboxReference(AllocateString(memory, name)));
 }
 
 Object AllocatePair(struct Memory *memory, Object car, Object cdr) {
@@ -341,6 +350,11 @@ void PrintObject(struct Memory *memory, Object object) {
       u64 reference = UnboxReference(object);
       printf("\"%s\"", (const char*)&memory->the_objects[reference+1]);
     } break;
+    case TAG_SYMBOL: {
+      u64 reference = UnboxReference(object);
+      // TODO: Handle escaping pipe characters
+      printf("%s", (const char*)&memory->the_objects[reference+1]);
+    } break;
     case TAG_VECTOR: {
       u64 reference = UnboxReference(object);
       u64 length = UnboxFixnum(memory->the_objects[reference]);
@@ -382,6 +396,7 @@ void PrintReference(Object object) {
       // Reference Objects
       case TAG_PAIR: printf("<Pair %llu>", UnboxReference(object)); break;
       case TAG_STRING: printf("<String %llu>", UnboxReference(object)); break;
+      case TAG_SYMBOL: printf("<Symbol %llu>", UnboxReference(object)); break;
       case TAG_VECTOR: printf("<Vector %llu>", UnboxReference(object)); break;
       case TAG_BYTE_VECTOR: printf("<ByteVector %llu>", UnboxReference(object)); break;
     }
@@ -450,7 +465,3 @@ void TestMemory() {
   //memory.root = AllocateVector(&memory, 32);
 }
 
-int main(int argc, char** argv) {
-  TestTag();
-  TestMemory();
-}
