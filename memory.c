@@ -1,9 +1,11 @@
+#include "memory.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
-#include "memory.h"
+#include "root.h"
 
 // Performs a garbage collection if there isn't enough memory.
 // If there still isn't enough memory, causes an exception.
@@ -209,7 +211,7 @@ Object MoveVector(struct Memory *memory, u64 ref) {
   return BoxVector(new_reference);
 }
 
-struct Memory AllocateMemory(u64 max_objects) {
+struct Memory AllocateMemory(u64 max_objects, u64 symbol_table_size) {
   struct Memory memory; 
   memory.max_objects = max_objects;
   memory.num_collections = 0;
@@ -225,8 +227,14 @@ struct Memory AllocateMemory(u64 max_objects) {
 
   for (u64 i = 0; i < memory.max_objects; ++i) memory.the_objects[i] = nil;
   memory.free = 0;
-  memory.root = nil;
+
+  InitializeRoot(&memory, symbol_table_size);
   return memory;
+}
+
+void DeallocateMemory(struct Memory *memory) {
+  free(memory->the_objects);
+  free(memory->new_objects);
 }
 
 void EnsureEnoughMemory(struct Memory *memory, u64 num_objects_required) {
@@ -299,11 +307,15 @@ Object AllocateString(struct Memory *memory, const char *string) {
   return BoxString(new_reference);
 }
 Object AllocateSymbol(struct Memory *memory, const char *name) {
-  return BoxSymbol(UnboxReference(AllocateString(memory, name)));
+  return BoxSymbol(AllocateString(memory, name));
 }
 
 Object AllocatePair(struct Memory *memory, Object car, Object cdr) {
+  // NOTE: hold onto the car/cdr references before running collection.
+  SavePair(memory, car, cdr);
   EnsureEnoughMemory(memory, 2);
+  RestoreSavedPair(memory, &car, &cdr);
+
   // [ ..., free.. ]
   u64 new_reference = memory->free;
   memory->the_objects[memory->free++] = car;
@@ -352,7 +364,7 @@ void PrintObject(struct Memory *memory, Object object) {
     } break;
     case TAG_SYMBOL: {
       u64 reference = UnboxReference(object);
-      // TODO: Handle escaping pipe characters
+      // TODO: Print escaping characters
       printf("%s", (const char*)&memory->the_objects[reference+1]);
     } break;
     case TAG_VECTOR: {
@@ -417,7 +429,7 @@ void PrintMemory(struct Memory *memory) {
 }
 
 void TestMemory() {
-  struct Memory memory = AllocateMemory(32);
+  struct Memory memory = AllocateMemory(32, 0);
   AllocatePair(&memory, BoxFixnum(4), BoxFixnum(2));
   Object string = AllocateString(&memory, "Hello");
 
@@ -433,35 +445,31 @@ void TestMemory() {
   ByteVectorSet(&memory, UnboxReference(byte_vector), 3, 0xe);
 
   Object shared = AllocatePair(&memory, byte_vector, string);
-  memory.root = AllocatePair(&memory, shared, AllocatePair(&memory, shared, vector));
+  SetTheObject(&memory, AllocatePair(&memory, shared, AllocatePair(&memory, shared, vector)));
 
   printf("Old Root: ");
-  PrintlnObject(&memory, memory.root);
+  PrintlnObject(&memory, GetTheObject(&memory));
   PrintMemory(&memory);
   CollectGarbage(&memory);
 
   printf("New Root: ");
-  PrintlnObject(&memory, memory.root);
+  PrintlnObject(&memory, GetTheObject(&memory));
   PrintMemory(&memory);
 
   for (int i = 0; i < 1000; ++i) {
     AllocatePair(&memory, BoxFixnum(0), BoxFixnum(1));
   }
   printf("Root: ");
-  PrintlnObject(&memory, memory.root);
+  PrintlnObject(&memory, GetTheObject(&memory));
   printf("Allocated %llu objects, performed %llu garbage collections, moved %llu objects,\n"
       "on average: %llf objects allocated/collection, %llf objects moved/collection\n",
       memory.num_objects_allocated, memory.num_collections, memory.num_objects_moved,
       memory.num_objects_allocated * 1.0 / memory.num_collections,
       memory.num_objects_moved * 1.0 / memory.num_collections);
 
-  memory.root = nil;
-  memory.root = AllocateVector(&memory, 31);
+  SetTheObject(&memory, nil);
+  SetTheObject(&memory, AllocateVector(&memory, 25));
   printf("Root: ");
-  PrintlnObject(&memory, memory.root);
-
-  memory.root = nil;
-  // NOTE: out of memory error
-  //memory.root = AllocateVector(&memory, 32);
+  PrintlnObject(&memory, GetTheObject(&memory));
 }
 

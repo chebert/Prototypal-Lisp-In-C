@@ -37,7 +37,8 @@ struct Memory {
 };
 
 // Allocate memory needed to store up to max_objects.
-struct Memory AllocateMemory(u64 max_objects);
+struct Memory AllocateMemory(u64 max_objects, u64 symbol_table_size);
+void DeallocateMemory(struct Memory *memory);
 // Perform a compacting garbage collection on the objects in memory
 void CollectGarbage(struct Memory *memory);
 

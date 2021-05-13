@@ -116,11 +116,11 @@ Object false        = TAGGED_OBJECT_MASK | SHIFT_LEFT(TAG_FALSE,        TAG_SHIF
 Object BoxFixnum(s64 fixnum)        { return TagPayload(PAYLOAD_MASK & fixnum, TAG_FIXNUM); }
 Object BoxBoolean(b64 boolean)      { return TagPayload(0, boolean ? TAG_TRUE : TAG_FALSE); }
 Object BoxReal32(real32 value)      { return TagPayload(Real32ToU32(value),    TAG_REAL32); }
-Object BoxPair(u64 reference)       { return TagPayload(reference, TAG_PAIR); }
-Object BoxVector(u64 reference)     { return TagPayload(reference, TAG_VECTOR); }
-Object BoxByteVector(u64 reference) { return TagPayload(reference, TAG_BYTE_VECTOR); }
-Object BoxString(u64 reference)     { return TagPayload(reference, TAG_STRING); }
-Object BoxSymbol(u64 reference)     { return TagPayload(reference, TAG_SYMBOL); }
+Object BoxPair(u64 reference)       { return TagPayload(PAYLOAD_MASK & reference, TAG_PAIR); }
+Object BoxVector(u64 reference)     { return TagPayload(PAYLOAD_MASK & reference, TAG_VECTOR); }
+Object BoxByteVector(u64 reference) { return TagPayload(PAYLOAD_MASK & reference, TAG_BYTE_VECTOR); }
+Object BoxString(u64 reference)     { return TagPayload(PAYLOAD_MASK & reference, TAG_STRING); }
+Object BoxSymbol(u64 reference)     { return TagPayload(PAYLOAD_MASK & reference, TAG_SYMBOL); }
 
 Object BoxReal64(real64 value) { return Real64ToU64(value); }
 Object BoxBrokenHeart(u64 num_bytes) { return TagPayload(num_bytes, TAG_BROKEN_HEART); }
