@@ -37,8 +37,9 @@ struct Memory {
 };
 
 // Allocate memory needed to store up to max_objects.
-struct Memory AllocateMemory(u64 max_objects, u64 symbol_table_size);
-void DeallocateMemory(struct Memory *memory);
+struct Memory InitializeMemory(u64 max_objects, u64 symbol_table_size);
+void DestroyMemory(struct Memory *memory);
+
 // Perform a compacting garbage collection on the objects in memory
 void CollectGarbage(struct Memory *memory);
 
@@ -58,10 +59,10 @@ Object AllocateString(struct Memory *memory, const char *string);
 Object AllocateSymbol(struct Memory *memory, const char *name);
 
 // Allocate a pair of 2 objects.
-Object AllocatePair(struct Memory *memory, Object car, Object cdr);
+Object AllocatePair(struct Memory *memory);
 Object Car(struct Memory *memory, u64 reference);
 Object Cdr(struct Memory *memory, u64 reference);
-void SetCdr(struct Memory *memory, u64 reference, Object value);
+void SetCar(struct Memory *memory, u64 reference, Object value);
 void SetCdr(struct Memory *memory, u64 reference, Object value);
 
 // Print an object, following references.

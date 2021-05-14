@@ -32,13 +32,13 @@ Object MakeSymbolTable(struct Memory *memory, u64 size) {
 }
 
 Object FindSymbol(struct Memory *memory, const char *name) {
-  Object symbol_table = GetSymbolTable(memory);
+  Object symbol_table = GetRegister(memory, REGISTER_SYMBOL_TABLE);
   u64 index = GetSymbolListIndex(memory, symbol_table, name);
   return FindSymbolInSymbolList(memory, symbol_table, index, name);
 }
 
 Object InternSymbol(struct Memory *memory, const char *name) {
-  Object symbol_table = GetSymbolTable(memory);
+  Object symbol_table = GetRegister(memory, REGISTER_SYMBOL_TABLE);
   u64 index = GetSymbolListIndex(memory, symbol_table, name);
   Object found = FindSymbolInSymbolList(memory, symbol_table, index, name);
   if (found != nil)
@@ -46,15 +46,23 @@ Object InternSymbol(struct Memory *memory, const char *name) {
 
   // Symbol not found
   // Create a new symbol and add it to the symbol list
-  Object symbols = VectorRef(memory, UnboxReference(GetSymbolTable(memory)), index);
-  Object new_symbols = AllocatePair(memory, AllocateSymbol(memory, name), symbols);
-  VectorSet(memory, UnboxReference(GetSymbolTable(memory)), index, new_symbols);
+  Object new_symbol = AllocateSymbol(memory, name);
+  Object new_symbols = AllocatePair(memory);
+
+  // TODO: error, new_symbol may be invalid after allocating new_symbols
+  SetCar(memory, UnboxReference(new_symbols), new_symbol);
+
+  Object old_symbols = VectorRef(memory, UnboxReference(GetRegister(memory, REGISTER_SYMBOL_TABLE)), index);
+  SetCdr(memory, UnboxReference(new_symbols), old_symbols);
+
+
+  VectorSet(memory, UnboxReference(GetRegister(memory, REGISTER_SYMBOL_TABLE)), index, new_symbols);
 
   return FindSymbol(memory, name);
 }
 
 void UninternSymbol(struct Memory *memory, const char *name) {
-  Object symbol_table = GetSymbolTable(memory);
+  Object symbol_table = GetRegister(memory, REGISTER_SYMBOL_TABLE);
   u64 index = GetSymbolListIndex(memory, symbol_table, name);
   Object symbols = VectorRef(memory, UnboxReference(symbol_table), index);
 
@@ -146,7 +154,7 @@ u32 HashString(const u8 *str) {
 void TestSymbolTable() {
   assert(HashString("symbol") == 2905944654);
 
-  struct Memory memory = AllocateMemory(128, 13);
+  struct Memory memory = InitializeMemory(128, 13);
 
   Object symbol = FindSymbol(&memory, "symbol");
   assert(symbol == nil);
@@ -162,8 +170,8 @@ void TestSymbolTable() {
   UninternSymbol(&memory, "symbol");
   assert(FindSymbol(&memory, "symbol") == nil);
 
-  DeallocateMemory(&memory);
-  memory = AllocateMemory(128, 1);
+  DestroyMemory(&memory);
+  memory = InitializeMemory(128, 1);
   InternSymbol(&memory, "symbol");
   InternSymbol(&memory, "dimple");
   InternSymbol(&memory, "pimple");

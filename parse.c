@@ -1,11 +1,13 @@
+#include "parse.h"
+
 #include <assert.h>
 #include <stdio.h>
 
 #include "tag.h"
 #include "memory.h"
 #include "symbol_table.h"
+#include "rope.h"
 
-#include "parse.h"
 
 // Object := floating-point
 //         | integer
@@ -187,7 +189,7 @@ Object ReadSymbol(struct Memory *memory, struct Stream *stream, struct ParseStat
 }
 
 void TestParse() {
-  struct Memory memory = AllocateMemory(128, 13);
+  struct Memory memory = InitializeMemory(128, 13);
   struct Stream stream = MakeStringStream("   symbol  ");
   struct ParseState state = MakeParseState();
   Object object = ReadObject(&memory, &stream, &state);
@@ -197,7 +199,6 @@ int main(int argc, char** argv) {
   TestTag();
   TestMemory();
   TestSymbolTable();
+  TestRope();
   //TestParse();
 }
-
-// TODO: Rope

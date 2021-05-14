@@ -211,7 +211,7 @@ Object MoveVector(struct Memory *memory, u64 ref) {
   return BoxVector(new_reference);
 }
 
-struct Memory AllocateMemory(u64 max_objects, u64 symbol_table_size) {
+struct Memory InitializeMemory(u64 max_objects, u64 symbol_table_size) {
   struct Memory memory; 
   memory.max_objects = max_objects;
   memory.num_collections = 0;
@@ -232,7 +232,7 @@ struct Memory AllocateMemory(u64 max_objects, u64 symbol_table_size) {
   return memory;
 }
 
-void DeallocateMemory(struct Memory *memory) {
+void DestroyMemory(struct Memory *memory) {
   free(memory->the_objects);
   free(memory->new_objects);
 }
@@ -310,16 +310,13 @@ Object AllocateSymbol(struct Memory *memory, const char *name) {
   return BoxSymbol(AllocateString(memory, name));
 }
 
-Object AllocatePair(struct Memory *memory, Object car, Object cdr) {
-  // NOTE: hold onto the car/cdr references before running collection.
-  SavePair(memory, car, cdr);
+Object AllocatePair(struct Memory *memory) {
   EnsureEnoughMemory(memory, 2);
-  RestoreSavedPair(memory, &car, &cdr);
 
   // [ ..., free.. ]
   u64 new_reference = memory->free;
-  memory->the_objects[memory->free++] = car;
-  memory->the_objects[memory->free++] = cdr;
+  memory->the_objects[memory->free++] = nil;
+  memory->the_objects[memory->free++] = nil;
   memory->num_objects_allocated += 2;
   // [ ..., car, cdr, free.. ]
   return BoxPair(new_reference);
@@ -428,9 +425,18 @@ void PrintMemory(struct Memory *memory) {
   printf(" |\n");
 }
 
+// Unsafe MakePair for simple tests.
+// If collection occurs while allocating the pair, then the passed in car/cdr are invalid.
+Object MakePair(struct Memory *memory, Object car, Object cdr) {
+  Object pair = AllocatePair(memory);
+  SetCar(memory, UnboxReference(pair), car);
+  SetCdr(memory, UnboxReference(pair), cdr);
+  return pair;
+}
+
 void TestMemory() {
-  struct Memory memory = AllocateMemory(32, 0);
-  AllocatePair(&memory, BoxFixnum(4), BoxFixnum(2));
+  struct Memory memory = InitializeMemory(32, 0);
+  MakePair(&memory, BoxFixnum(4), BoxFixnum(2));
   Object string = AllocateString(&memory, "Hello");
 
   Object vector = AllocateVector(&memory, 3);
@@ -444,32 +450,32 @@ void TestMemory() {
   ByteVectorSet(&memory, UnboxReference(byte_vector), 2, 0xf);
   ByteVectorSet(&memory, UnboxReference(byte_vector), 3, 0xe);
 
-  Object shared = AllocatePair(&memory, byte_vector, string);
-  SetTheObject(&memory, AllocatePair(&memory, shared, AllocatePair(&memory, shared, vector)));
+  Object shared = MakePair(&memory, byte_vector, string);
+  SetRegister(&memory, REGISTER_THE_OBJECT, MakePair(&memory, shared, MakePair(&memory, shared, vector)));
 
   printf("Old Root: ");
-  PrintlnObject(&memory, GetTheObject(&memory));
+  PrintlnObject(&memory, GetRegister(&memory, REGISTER_THE_OBJECT));
   PrintMemory(&memory);
   CollectGarbage(&memory);
 
   printf("New Root: ");
-  PrintlnObject(&memory, GetTheObject(&memory));
+  PrintlnObject(&memory, GetRegister(&memory, REGISTER_THE_OBJECT));
   PrintMemory(&memory);
 
   for (int i = 0; i < 1000; ++i) {
-    AllocatePair(&memory, BoxFixnum(0), BoxFixnum(1));
+    MakePair(&memory, BoxFixnum(0), BoxFixnum(1));
   }
   printf("Root: ");
-  PrintlnObject(&memory, GetTheObject(&memory));
+  PrintlnObject(&memory, GetRegister(&memory, REGISTER_THE_OBJECT));
   printf("Allocated %llu objects, performed %llu garbage collections, moved %llu objects,\n"
       "on average: %llf objects allocated/collection, %llf objects moved/collection\n",
       memory.num_objects_allocated, memory.num_collections, memory.num_objects_moved,
       memory.num_objects_allocated * 1.0 / memory.num_collections,
       memory.num_objects_moved * 1.0 / memory.num_collections);
 
-  SetTheObject(&memory, nil);
-  SetTheObject(&memory, AllocateVector(&memory, 25));
+  SetRegister(&memory, REGISTER_THE_OBJECT, nil);
+  SetRegister(&memory, REGISTER_THE_OBJECT, AllocateVector(&memory, 25));
   printf("Root: ");
-  PrintlnObject(&memory, GetTheObject(&memory));
+  PrintlnObject(&memory, GetRegister(&memory, REGISTER_THE_OBJECT));
 }
 
