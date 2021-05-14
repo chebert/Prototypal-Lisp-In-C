@@ -3,6 +3,20 @@
 
 #include "tag.h"
 
+// Memory Layouts:
+//
+// Before Moving:
+// TYPE     | SIZE in Objects        | LAYOUT                                                 | LAYOUT after Moving           |
+// ---------|------------------------|--------------------------------------------------------|-------------------------------|
+// PRIMITIVE|(1)                     |[ ..., primitive, ...]                                  |[ ..., primitive, ...]         |
+// REFERENCE|(1)                     |[ ..., reference, ...]                                  |[ ..., reference, ...]         |
+// PAIR     |(2)                     |[ ..., car, cdr, ... ]                                  |[ ..., <BH new>, cdr ]         |
+// VECTOR   |(nObjects+1)            |[ ..., nObjects, object0, object1, .., objectN, ... ]   |[ ..., <BH new>, object0, ... ]|
+// BLOB     |(ceiling(nBytes, 8) + 1)|[ ..., nBytes, byte0, byte1, .., byteN, pad.., ... ]    |[ ..., <BH new>, byte0, ... ]  |
+
+// Blobs are padded to the nearest Object boundary.
+// <BH new>: A Broken Heart points to the newly allocated structure at index new.
+
 // TODO: A garbage collector which has 2 live regions instead of 1
 //  - Large: contains large & old objects
 //  - Small: contains small & new objects
@@ -43,27 +57,11 @@ void DestroyMemory(struct Memory *memory);
 // Perform a compacting garbage collection on the objects in memory
 void CollectGarbage(struct Memory *memory);
 
-// Allocate and access a vector of objects.
-Object AllocateVector(struct Memory *memory, u64 num_objects);
-s64 VectorLength(struct Memory *memory, u64 reference);
-Object VectorRef(struct Memory *memory, u64 reference, u64 index);
-void VectorSet(struct Memory *memory, u64 reference, u64 index, Object value);
+// Performs a garbage collection if there isn't enough memory.
+// If there still isn't enough memory, causes an exception.
+void EnsureEnoughMemory(struct Memory *memory, u64 num_objects_required);
 
-// Allocate and access a vector of 8-bit bytes.
-Object AllocateByteVector(struct Memory *memory, u64 num_bytes);
-Object ByteVectorRef(struct Memory *memory, u64 reference, u64 index);
-void ByteVectorSet(struct Memory *memory, u64 reference, u64 index, u8 value);
-
-// Allocate a string of characters.
-Object AllocateString(struct Memory *memory, const char *string);
-Object AllocateSymbol(struct Memory *memory, const char *name);
-
-// Allocate a pair of 2 objects.
-Object AllocatePair(struct Memory *memory);
-Object Car(struct Memory *memory, u64 reference);
-Object Cdr(struct Memory *memory, u64 reference);
-void SetCar(struct Memory *memory, u64 reference, Object value);
-void SetCdr(struct Memory *memory, u64 reference, Object value);
+// Warning: Every time you Allocate, all references in C code may be invalid.
 
 // Print an object, following references.
 void PrintObject(struct Memory *memory, Object object);

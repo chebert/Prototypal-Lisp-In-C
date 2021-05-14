@@ -4,7 +4,10 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "pair.h"
 #include "root.h"
+#include "symbol.h"
+#include "vector.h"
 
 // Returns the first object in a list
 Object First(struct Memory *memory, Object pair);
@@ -26,19 +29,23 @@ Object Append(struct Memory *memory, Object list_a, Object list_b);
 // Returns list but reversed.
 Object Reverse(struct Memory *memory, Object list);
 
+// Return the global symbol table
+Object GetSymbolTable(struct Memory *memory);
+
 // A Symbol table is a Hashed set, represented as a vector of Symbol Lists
 Object MakeSymbolTable(struct Memory *memory, u64 size) {
   return AllocateVector(memory, size);
 }
 
+
 Object FindSymbol(struct Memory *memory, const char *name) {
-  Object symbol_table = GetRegister(memory, REGISTER_SYMBOL_TABLE);
+  Object symbol_table = GetSymbolTable(memory);
   u64 index = GetSymbolListIndex(memory, symbol_table, name);
   return FindSymbolInSymbolList(memory, symbol_table, index, name);
 }
 
 Object InternSymbol(struct Memory *memory, const char *name) {
-  Object symbol_table = GetRegister(memory, REGISTER_SYMBOL_TABLE);
+  Object symbol_table = GetSymbolTable(memory);
   u64 index = GetSymbolListIndex(memory, symbol_table, name);
   Object found = FindSymbolInSymbolList(memory, symbol_table, index, name);
   if (found != nil)
@@ -47,22 +54,16 @@ Object InternSymbol(struct Memory *memory, const char *name) {
   // Symbol not found
   // Create a new symbol and add it to the symbol list
   Object new_symbol = AllocateSymbol(memory, name);
-  Object new_symbols = AllocatePair(memory);
+  Object old_symbols = VectorRef(memory, UnboxReference(GetSymbolTable(memory)), index);
+  Object new_symbols = MakePair(memory, new_symbol, old_symbols);
 
-  // TODO: error, new_symbol may be invalid after allocating new_symbols
-  SetCar(memory, UnboxReference(new_symbols), new_symbol);
-
-  Object old_symbols = VectorRef(memory, UnboxReference(GetRegister(memory, REGISTER_SYMBOL_TABLE)), index);
-  SetCdr(memory, UnboxReference(new_symbols), old_symbols);
-
-
-  VectorSet(memory, UnboxReference(GetRegister(memory, REGISTER_SYMBOL_TABLE)), index, new_symbols);
+  VectorSet(memory, UnboxReference(GetSymbolTable(memory)), index, new_symbols);
 
   return FindSymbol(memory, name);
 }
 
 void UninternSymbol(struct Memory *memory, const char *name) {
-  Object symbol_table = GetRegister(memory, REGISTER_SYMBOL_TABLE);
+  Object symbol_table = GetSymbolTable(memory);
   u64 index = GetSymbolListIndex(memory, symbol_table, name);
   Object symbols = VectorRef(memory, UnboxReference(symbol_table), index);
 
@@ -149,6 +150,10 @@ u32 HashString(const u8 *str) {
   for (u8 c = *str; c; c = *str++)
     hash = hash*33 + c;
   return hash;
+}
+
+Object GetSymbolTable(struct Memory *memory) {
+  return GetRegister(memory, REGISTER_SYMBOL_TABLE);
 }
 
 void TestSymbolTable() {
