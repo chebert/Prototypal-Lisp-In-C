@@ -16,7 +16,7 @@
 Object MakeRope(struct Memory *memory, s64 string_size);
 
 // Append a character to the end of the rope.
-Object AppendRope(struct Memory *memory, Object rope, u8 character);
+void AppendRope(struct Memory *memory, Object rope, u8 character);
 
 // Return a single string with all of the characters in rope copied into it.
 Object FinalizeRope(struct Memory *memory, Object rope);

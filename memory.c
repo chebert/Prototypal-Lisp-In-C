@@ -215,7 +215,7 @@ void TestMemory() {
       memory.num_objects_moved * 1.0 / memory.num_collections);
 
   SetRegister(&memory, REGISTER_THE_OBJECT, nil);
-  SetRegister(&memory, REGISTER_THE_OBJECT, AllocateVector(&memory, 25));
+  SetRegister(&memory, REGISTER_THE_OBJECT, AllocateVector(&memory, 29 - NUM_REGISTERS));
   printf("Root: ");
   PrintlnObject(&memory, GetRegister(&memory, REGISTER_THE_OBJECT));
 }
