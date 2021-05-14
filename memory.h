@@ -3,29 +3,31 @@
 
 #include "tag.h"
 
-// Memory Layouts:
+// Memory is managed using a stop-and-copy garbage collection algorithm.
 //
-// Before Moving:
-// TYPE     | SIZE in Objects        | LAYOUT                                                 | LAYOUT after Moving           |
+// Root references the live objects in the system. Anything not reachable from the root is considered garbage.
+// Memory consists of two regions:
+//   the_objects: a mixture the current (live) objects and discared (garbage) objects in the system.
+//   new_objects: during GC, live/reachable objects are moved from the_objects into new_objects.
+//      when complete, the new_objects and the_objects are swapped
+//
+// A Garbage Collection occurs when the system attempts to Allocate and there is not enough memory.
+// If there is still not enough memory after GC, the system fails.
+// A collection can be invoked early with CollectGarbage();
+
+// Memory Layouts During GC:
+//
+// Memory layouts in the_objects before and after moving:
+// TYPE     | SIZE in Objects        | LAYOUT before Moving                                   | LAYOUT after Moving           |
 // ---------|------------------------|--------------------------------------------------------|-------------------------------|
-// PRIMITIVE|(1)                     |[ ..., primitive, ...]                                  |[ ..., primitive, ...]         |
-// REFERENCE|(1)                     |[ ..., reference, ...]                                  |[ ..., reference, ...]         |
-// PAIR     |(2)                     |[ ..., car, cdr, ... ]                                  |[ ..., <BH new>, cdr ]         |
-// VECTOR   |(nObjects+1)            |[ ..., nObjects, object0, object1, .., objectN, ... ]   |[ ..., <BH new>, object0, ... ]|
-// BLOB     |(ceiling(nBytes, 8) + 1)|[ ..., nBytes, byte0, byte1, .., byteN, pad.., ... ]    |[ ..., <BH new>, byte0, ... ]  |
+// PRIMITIVE| 1                      |[ ..., primitive, ...]                                  |[ ..., primitive, ...]         |
+// REFERENCE| 1                      |[ ..., reference, ...]                                  |[ ..., reference, ...]         |
+// PAIR     | 2                      |[ ..., car, cdr, ... ]                                  |[ ..., <BH new>, cdr ]         |
+// VECTOR   | nObjects+1             |[ ..., nObjects, object0, object1, .., objectN, ... ]   |[ ..., <BH new>, object0, ... ]|
+// BLOB     | ceiling(nBytes, 8) + 1 |[ ..., nBytes, byte0, byte1, .., byteN, pad.., ... ]    |[ ..., <BH new>, byte0, ... ]  |
 
 // Blobs are padded to the nearest Object boundary.
-// <BH new>: A Broken Heart points to the newly allocated structure at index new.
-
-// TODO: A garbage collector which has 2 live regions instead of 1
-//  - Large: contains large & old objects
-//  - Small: contains small & new objects
-// When the small runs out of memory, a collection occurs.
-//   Objects in the small region are moved to the large region.
-//   Objects in the large region are not moved.
-// When the large runs out of memory, a collection occurs.
-//   Objects in the large region are moved.
-// This is to reduce the size of moves, since most objects are short-lived and small.
+// <BH new>: A Broken Heart points to the newly moved structure in new_objects at index new.
 
 // TODO: Weak References
 
@@ -67,8 +69,6 @@ void EnsureEnoughMemory(struct Memory *memory, u64 num_objects_required);
 void PrintObject(struct Memory *memory, Object object);
 // Print an object, following references, followed by a newline.
 void PrintlnObject(struct Memory *memory, Object object);
-// Print an object, not following references.
-void PrintReference(Object object);
 
 void TestMemory();
 

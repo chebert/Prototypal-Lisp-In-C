@@ -2,6 +2,17 @@
 #define TAG_H
 #include <stdint.h>
 
+// A tagged Object is a 64-bit structure with a tag and a payload.
+// In this case, a technique called NAN-boxing is used. This means that
+// an Object is either a double, or a 51-bit tag-and-payload structure.
+// If the double represents a negative NAN (an essentially unused value),
+// then we assume it must be a tagged type.
+//
+// To Box a value, we convert from a C-type to a tagged Object.
+// To Unbox a value, we convert from a tagged Object to a C-type.
+//
+// The supported tags are listed in the Tag enumeration.
+
 // Simpler type names
 typedef int64_t  s64;
 typedef uint64_t u64;
@@ -17,23 +28,23 @@ typedef u64      Object;
 // Type Tags for Objects
 enum Tag {
   // Tag-only types (no payload)
-  TAG_NIL,
-  TAG_TRUE,
-  TAG_FALSE,
+  TAG_NIL,   // Represent the end of a list, or no value
+  TAG_TRUE,  // Represent the boolean value true
+  TAG_FALSE, // Represent the boolean value false
 
   // Primitive Types
-  TAG_FIXNUM,
-  TAG_REAL32,
+  TAG_FIXNUM, // Fixnum is a 47-bit signed integer
+  TAG_REAL32, // 32-bit float
 
   // Reference Types (Payloads are indices into memory vectors)
-  TAG_PAIR,
-  TAG_VECTOR,
-  TAG_BYTE_VECTOR,
-  TAG_STRING,
-  TAG_SYMBOL,
+  TAG_PAIR, // Pair consists of two Objects
+  TAG_VECTOR, // Vector consists of a length N, followed by N objects
+  TAG_BYTE_VECTOR, // Byte vector consists of a length N, followed by at least N bytes
+  TAG_STRING, // String consists of a length N, followed by at least N+1 bytes. String is 0-terminated
+  TAG_SYMBOL, // Symbol is a string with a different tag.
 
   // GC Types (Types not directly accessible)
-  TAG_BROKEN_HEART,
+  TAG_BROKEN_HEART, // Used to annotate referenced objects that have been moved during garbage collection.
 
   NUM_TAGS,
 };

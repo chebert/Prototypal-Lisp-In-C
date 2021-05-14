@@ -3,6 +3,9 @@
 
 #include "memory.h"
 
+// A byte vector is an array of 8-bit unsigned bytes.
+// It is implemented as a Blob.
+
 // Allocate and access a vector of 8-bit bytes.
 Object AllocateByteVector(struct Memory *memory, u64 num_bytes);
 Object MoveByteVector(struct Memory *memory, u64 ref);

@@ -3,6 +3,11 @@
 
 #include "memory.h"
 
+// A pair is a compound type representing 2 associated Objects.
+// Memory Layout: [ ..., car, cdr, ...]
+//
+// A pair Object is a reference to this pair.
+
 // Allocate a pair of 2 objects.
 Object AllocatePair(struct Memory *memory);
 // Move a pair from the_objects to new_objects

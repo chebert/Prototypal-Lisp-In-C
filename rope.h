@@ -3,13 +3,15 @@
 
 #include "memory.h"
 
-// TODO: where to put the rope, so I still have access to it after allocating.
-
-// A rope can chain together strings, to make dynamically sized strings.
+// A rope is a data structure which chains strings together, one after the other.
+// When the rope is unable to append a character, the rope is extended to have a new, empty string.
+// This enables the reading of unpredictably large strings/symbols,
+// without wasting space.
+//
+// Internally a rope is a list of strings.
 // A rope can be finalized into a single string.
 
 // Construct a rope of strings.
-// Each string is string_size+1 in length.
 // rope := (string-size . strings-list)
 Object MakeRope(struct Memory *memory, s64 string_size);
 

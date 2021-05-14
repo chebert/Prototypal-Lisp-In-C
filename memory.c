@@ -19,6 +19,9 @@ Object MoveObject(struct Memory *memory, Object object);
 // Functions for moving specific types of objects.
 Object MovePrimitive(Object object);
 
+// Print an object, not following references.
+void PrintReference(Object object);
+
 void CollectGarbage(struct Memory *memory) {
   ++memory->num_collections;
   printf("CollectGarbage: Beginning a garbage collection number %d\n", memory->num_collections);
@@ -118,6 +121,7 @@ void PrintObject(struct Memory *memory, Object object) {
     return;
   }
   switch (GetTag(object)) {
+    // Primitives
     case TAG_NIL:    printf("nil"); break;
     case TAG_TRUE:   printf("#t");  break;
     case TAG_FALSE:  printf("#f");  break;
@@ -143,16 +147,16 @@ void PrintReference(Object object) {
     printf("%llf", UnboxReal64(object));
   } else {
     switch (GetTag(object)) {
-      case TAG_NIL:    printf("nil"); break;
-      case TAG_TRUE:   printf("true"); break;
+      case TAG_NIL:    printf("nil");   break;
+      case TAG_TRUE:   printf("true");  break;
       case TAG_FALSE:  printf("false"); break;
       case TAG_FIXNUM: printf("%lld", UnboxFixnum(object)); break;
-      case TAG_REAL32: printf("%ff", UnboxReal32(object)); break;
+      case TAG_REAL32: printf("%ff", UnboxReal32(object));  break;
       // Reference Objects
-      case TAG_PAIR: printf("<Pair %llu>", UnboxReference(object)); break;
-      case TAG_STRING: printf("<String %llu>", UnboxReference(object)); break;
-      case TAG_SYMBOL: printf("<Symbol %llu>", UnboxReference(object)); break;
-      case TAG_VECTOR: printf("<Vector %llu>", UnboxReference(object)); break;
+      case TAG_PAIR:        printf("<Pair %llu>",       UnboxReference(object)); break;
+      case TAG_STRING:      printf("<String %llu>",     UnboxReference(object)); break;
+      case TAG_SYMBOL:      printf("<Symbol %llu>",     UnboxReference(object)); break;
+      case TAG_VECTOR:      printf("<Vector %llu>",     UnboxReference(object)); break;
       case TAG_BYTE_VECTOR: printf("<ByteVector %llu>", UnboxReference(object)); break;
     }
   }
