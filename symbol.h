@@ -9,7 +9,7 @@
 
 Object AllocateSymbol(const char *name);
 
-Object MoveSymbol(u64 ref);
+Object MoveSymbol(Object symbol);
 void PrintSymbol(Object symbol);
 
 #endif

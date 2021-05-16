@@ -20,7 +20,8 @@ Object AllocateVector(u64 num_objects) {
   return BoxVector(new_reference);
 }
 
-Object MoveVector(u64 ref) {
+Object MoveVector(Object vector) {
+  u64 ref = UnboxReference(vector);
   // New: [ ..., free... ]
   // Old: [ ..., nObjects, Object0, ... ObjectN, ... ] OR
   //      [ ..., <BH new>, ... ]
@@ -53,19 +54,23 @@ Object MoveVector(u64 ref) {
   return BoxVector(new_reference);
 }
 
-s64 VectorLength(u64 reference) {
-  return UnboxFixnum(memory.the_objects[reference]);
+s64 VectorLength(Object vector) {
+  assert(IsVector(vector));
+  return UnboxFixnum(memory.the_objects[UnboxReference(vector)]);
 }
-Object VectorRef(u64 reference, u64 index) {
-  assert(index < VectorLength(reference));
-  return memory.the_objects[reference+1 + index];
+Object VectorRef(Object vector, u64 index) {
+  assert(IsVector(vector));
+  assert(index < VectorLength(vector));
+  return memory.the_objects[UnboxReference(vector)+1 + index];
 }
-void VectorSet(u64 reference, u64 index, Object value) {
-  assert(index < VectorLength(reference));
-  memory.the_objects[reference+1 + index] = value;
+void VectorSet(Object vector, u64 index, Object value) {
+  assert(IsVector(vector));
+  assert(index < VectorLength(vector));
+  memory.the_objects[UnboxReference(vector)+1 + index] = value;
 }
 
 void PrintVector(Object vector) {
+  assert(IsVector(vector));
   u64 reference = UnboxReference(vector);
   u64 length = UnboxFixnum(memory.the_objects[reference]);
   printf("(vector");

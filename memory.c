@@ -72,11 +72,11 @@ Object MoveObject(Object object) {
       return MovePrimitive(object);
 
     // Reference Objects
-    case TAG_PAIR:        return       MovePair(UnboxReference(object));
-    case TAG_STRING:      return     MoveString(UnboxReference(object));
-    case TAG_SYMBOL:      return     MoveSymbol(UnboxReference(object));
-    case TAG_VECTOR:      return     MoveVector(UnboxReference(object));
-    case TAG_BYTE_VECTOR: return MoveByteVector(UnboxReference(object));
+    case TAG_PAIR:        return       MovePair(object);
+    case TAG_STRING:      return     MoveString(object);
+    case TAG_SYMBOL:      return     MoveSymbol(object);
+    case TAG_VECTOR:      return     MoveVector(object);
+    case TAG_BYTE_VECTOR: return MoveByteVector(object);
   }
 
   assert(!"Error: unrecognized object");
@@ -182,15 +182,15 @@ void TestMemory() {
   Object string = AllocateString("Hello");
 
   Object vector = AllocateVector(3);
-  VectorSet(UnboxReference(vector), 0, AllocateString("Zero"));
-  VectorSet(UnboxReference(vector), 1, AllocateString("One"));
-  VectorSet(UnboxReference(vector), 2, AllocateString("Two"));
+  VectorSet(vector, 0, AllocateString("Zero"));
+  VectorSet(vector, 1, AllocateString("One"));
+  VectorSet(vector, 2, AllocateString("Two"));
 
   Object byte_vector = AllocateByteVector(4);
-  ByteVectorSet(UnboxReference(byte_vector), 0, 0xc);
-  ByteVectorSet(UnboxReference(byte_vector), 1, 0xa);
-  ByteVectorSet(UnboxReference(byte_vector), 2, 0xf);
-  ByteVectorSet(UnboxReference(byte_vector), 3, 0xe);
+  ByteVectorSet(byte_vector, 0, 0xc);
+  ByteVectorSet(byte_vector, 1, 0xa);
+  ByteVectorSet(byte_vector, 2, 0xf);
+  ByteVectorSet(byte_vector, 3, 0xe);
 
   Object shared = MakePair(byte_vector, string);
   SetRegister(REGISTER_THE_OBJECT, MakePair(shared, MakePair(shared, vector)));
@@ -220,4 +220,3 @@ void TestMemory() {
   printf("Root: ");
   PrintlnObject(GetRegister(REGISTER_THE_OBJECT));
 }
-

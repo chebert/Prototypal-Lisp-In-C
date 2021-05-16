@@ -13,18 +13,24 @@ Object AllocateByteVector(u64 num_bytes) {
   return BoxByteVector(new_reference);
 }
 
-Object MoveByteVector(u64 ref) {
-  return BoxByteVector(MoveBlob(ref));
+Object MoveByteVector(Object byte_vector) {
+  return BoxByteVector(MoveBlob(UnboxReference(byte_vector)));
 }
 
-Object ByteVectorRef(u64 reference, u64 index) {
-  assert(index < UnboxFixnum(memory.the_objects[reference]));
-  u8 *bytes = (u8*)&memory.the_objects[reference+1];
+s64 ByteVectorLength(Object byte_vector) {
+  return UnboxFixnum(memory.the_objects[UnboxReference(byte_vector)]);
+}
+
+Object ByteVectorRef(Object byte_vector, u64 index) {
+  assert(IsByteVector(byte_vector));
+  assert(index < ByteVectorLength(byte_vector));
+  u8 *bytes = (u8*)&memory.the_objects[UnboxReference(byte_vector)+1];
   return BoxFixnum(bytes[index]);
 }
-void ByteVectorSet(u64 reference, u64 index, u8 value) {
-  assert(index < UnboxFixnum(memory.the_objects[reference]));
-  u8 *bytes = (u8*)&memory.the_objects[reference+1];
+void ByteVectorSet(Object byte_vector, u64 index, u8 value) {
+  assert(IsByteVector(byte_vector));
+  assert(index < ByteVectorLength(byte_vector));
+  u8 *bytes = (u8*)&memory.the_objects[UnboxReference(byte_vector)+1];
   bytes[index] = value;
 }
 

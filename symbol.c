@@ -6,8 +6,8 @@
 #include "memory.h"
 #include "string.h"
 
-Object MoveSymbol(u64 ref) { 
-  return BoxSymbol(MoveBlob(ref));
+Object MoveSymbol(Object symbol) { 
+  return BoxSymbol(MoveBlob(UnboxReference(symbol)));
 }
 
 Object AllocateSymbol(const char *name) {

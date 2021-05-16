@@ -50,10 +50,10 @@ Object InternSymbol(const char *name) {
   // Symbol not found
   // Create a new symbol and add it to the symbol list
   Object new_symbol = AllocateSymbol(name);
-  Object old_symbols = VectorRef(UnboxReference(GetSymbolTable()), index);
+  Object old_symbols = VectorRef(GetSymbolTable(), index);
   Object new_symbols = MakePair(new_symbol, old_symbols);
 
-  VectorSet(UnboxReference(GetSymbolTable()), index, new_symbols);
+  VectorSet(GetSymbolTable(), index, new_symbols);
 
   return FindSymbol(name);
 }
@@ -61,10 +61,10 @@ Object InternSymbol(const char *name) {
 void UninternSymbol(const char *name) {
   Object symbol_table = GetSymbolTable();
   u64 index = GetSymbolListIndex(symbol_table, name);
-  Object symbols = VectorRef(UnboxReference(symbol_table), index);
+  Object symbols = VectorRef(symbol_table, index);
 
   Object new_symbols = RemoveSymbolDestructively(symbols, name);
-  VectorSet(UnboxReference(symbol_table), index, new_symbols);
+  VectorSet(symbol_table, index, new_symbols);
 }
 
 
@@ -72,7 +72,7 @@ void UninternSymbol(const char *name) {
 
 u64 GetSymbolListIndex(Object symbol_table, const char *name) {
   u32 hash = HashString(name);
-  s64 length = VectorLength(UnboxReference(symbol_table));
+  s64 length = VectorLength(symbol_table);
   return hash % length;
 }
 
@@ -112,7 +112,7 @@ Object RemoveSymbolDestructively(Object symbols, const char *name) {
 }
 
 Object FindSymbolInSymbolList(Object symbol_table, u64 index, const char *name) {
-  for (Object symbols = VectorRef(UnboxReference(symbol_table), index);
+  for (Object symbols = VectorRef(symbol_table, index);
       symbols != nil;
       symbols = Rest(symbols)) {
     Object symbol = First(symbols);

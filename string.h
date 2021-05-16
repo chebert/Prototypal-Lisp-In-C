@@ -7,7 +7,7 @@
 // It is implemented as a Blob, whose size is string_length+1 to include the terminator.
 
 Object AllocateString(const char *string);
-Object MoveString(u64 ref);
+Object MoveString(Object string);
 void PrintString(Object object);
 
 #endif

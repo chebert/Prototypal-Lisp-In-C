@@ -8,9 +8,17 @@
 
 // Allocate and access a vector of 8-bit bytes.
 Object AllocateByteVector(u64 num_bytes);
-Object MoveByteVector(u64 ref);
-Object ByteVectorRef(u64 reference, u64 index);
-void ByteVectorSet(u64 reference, u64 index, u8 value);
+Object MoveByteVector(Object byte_vector);
+
+// Returns the number of bytes in byte_vector.
+s64 ByteVectorLength(Object byte_vector);
+
+// Returns a fixnum representing the byte at the given 0-based index
+Object ByteVectorRef(Object byte_vector, u64 index);
+
+// Sets the byte at the given 0-based index to value.
+void ByteVectorSet(Object byte_vector, u64 index, u8 value);
+
 void PrintByteVector(Object object);
 
 #endif

@@ -14,8 +14,8 @@ Object AllocateString(const char *string) {
   return BoxString(new_reference);
 }
 
-Object MoveString(u64 ref) { 
-  return BoxString(MoveBlob(ref));
+Object MoveString(Object string) { 
+  return BoxString(MoveBlob(UnboxReference(string)));
 }
 
 void PrintString(Object object) {

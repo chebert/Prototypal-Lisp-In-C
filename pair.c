@@ -18,7 +18,8 @@ Object AllocatePair() {
   return BoxPair(new_reference);
 }
 
-Object MovePair(u64 ref) {
+Object MovePair(Object pair) {
+  u64 ref = UnboxReference(pair);
   // New: [ ..., free... ]
   // Old: [ ..., car, cdr, ...] OR
   //      [ ..., <BH new>, ... ]
@@ -34,14 +35,14 @@ Object MovePair(u64 ref) {
   }
 
   printf("    MovePair: Moving from the_objects to new_objects, leaving a broken heart at %llu pointing to %llu\n", ref, new_reference);
-  Object the_pair = BoxPair(new_reference);
+  Object moved_pair = BoxPair(new_reference);
   // Old: [ ..., car, cdr, ... ]
   memory.new_objects[memory.free++] = old_car;
   memory.new_objects[memory.free++] = memory.the_objects[ref+1];
   memory.the_objects[ref] = BoxBrokenHeart(new_reference);
   // New: [ ..., car, cdr, free.. ]
   // Old: [ ...,  <BH new>, ... ]
-  return the_pair;
+  return moved_pair;
 }
 
 Object Car(Object pair) {

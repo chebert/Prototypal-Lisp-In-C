@@ -11,7 +11,7 @@
 // Allocate a pair of 2 objects.
 Object AllocatePair();
 // Move a pair from the_objects to new_objects
-Object MovePair(u64 ref);
+Object MovePair(Object pair);
 
 Object Car(Object pair);
 Object Cdr(Object pair);

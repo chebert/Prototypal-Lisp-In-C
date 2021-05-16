@@ -9,11 +9,11 @@
 // Allocate and access a vector of objects.
 Object AllocateVector(u64 num_objects);
 
-Object MoveVector(u64 ref);
+Object MoveVector(Object vector);
 
-s64 VectorLength(u64 reference);
-Object VectorRef(u64 reference, u64 index);
-void VectorSet(u64 reference, u64 index, Object value);
+s64 VectorLength(Object vector);
+Object VectorRef(Object vector, u64 index);
+void VectorSet(Object vector, u64 index, Object value);
 void PrintVector(Object vector);
 
 

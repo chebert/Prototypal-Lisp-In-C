@@ -6,15 +6,15 @@
 
 void InitializeRoot(u64 symbol_table_size) {
   memory.root = AllocateVector(NUM_REGISTERS);
-  VectorSet(UnboxReference(memory.root), REGISTER_SYMBOL_TABLE, MakeSymbolTable(symbol_table_size));
+  VectorSet(memory.root, REGISTER_SYMBOL_TABLE, MakeSymbolTable(symbol_table_size));
 }
 
 Object GetRegister(enum Register reg) {
-  return VectorRef(UnboxReference(memory.root), reg); 
+  return VectorRef(memory.root, reg); 
 }
 
 void SetRegister(enum Register reg, Object value) {
-  VectorSet(UnboxReference(memory.root), reg, value); 
+  VectorSet(memory.root, reg, value); 
 }
 
 void SavePair(Object car, Object cdr) {
