@@ -45,6 +45,7 @@ enum Tag {
 
   // GC Types (Types not directly accessible)
   TAG_BROKEN_HEART, // Used to annotate referenced objects that have been moved during garbage collection.
+  TAG_BLOB_HEADER, // Stores an unsigned integer which stores the size of the blob in bytes
 
   NUM_TAGS,
 };
@@ -59,6 +60,7 @@ enum Tag GetTag(Object object);
 // Helper functions determine if an Object is tagged, and whether
 // it has the given tag.
 b64 IsBrokenHeart(Object object);
+b64 IsBlobHeader(Object object);
 b64 IsFixnum(Object object);
 b64 IsTrue(Object object);
 b64 IsFalse(Object object);
@@ -84,6 +86,7 @@ Object BoxString(u64 reference);
 Object BoxSymbol(u64 reference);
 // Box GC Types
 Object BoxBrokenHeart(u64 reference);
+Object BoxBlobHeader(u64 num_bytes);
 
 extern Object nil;
 extern Object true;
@@ -98,6 +101,7 @@ real64 UnboxReal64(Object object);
 u64 UnboxReference(Object object);
 // Unbox GC Types
 u64 UnboxBrokenHeart(Object object);
+u64 UnboxBlobHeader(Object object);
 
 // Function to run through tag tests.
 void TestTag();

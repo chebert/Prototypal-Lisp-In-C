@@ -46,7 +46,14 @@ void CollectGarbage() {
   // when scan catches up to free, the entire memory has been scanned/moved.
   for (u64 scan = 0; scan < memory.free; ++scan) {
     printf("CollectGarbage: Scanning object at %llu. Free=%llu\n", scan, memory.free);
-    memory.new_objects[scan] = MoveObject(memory.new_objects[scan]);
+    Object object = memory.new_objects[scan];
+    if (IsBlobHeader(object)) {
+      u64 num_objects = NumObjectsPerBlob(UnboxBlobHeader(object));
+      scan += num_objects;
+      printf("CollectGarbage: Encountered blob of size %llu objects. Scan=%llu\n", num_objects, scan);
+    } else {
+      memory.new_objects[scan] = MoveObject(object);
+    }
   }
   memory.num_objects_moved += memory.free;
 

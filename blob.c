@@ -8,8 +8,6 @@
 
 // Returns ceiling(numerator/denominator)
 u64 CeilingU64(u64 numerator, u64 denominator);
-// Returns the number of Objects in a Blob (including header)
-u64 NumObjectsPerBlob(u64 bytes_in_blob);
 
 
 u64 AllocateBlob(u64 num_bytes) {
@@ -18,7 +16,7 @@ u64 AllocateBlob(u64 num_bytes) {
   // [ ..., free.. ]
 
   u64 new_reference = memory.free;
-  memory.the_objects[new_reference] = BoxFixnum(num_bytes);
+  memory.the_objects[new_reference] = BoxBlobHeader(num_bytes);
   memory.free += num_objects;
   memory.num_objects_allocated += num_objects;
   // [ ..., nBytes, byte0, ..., byteN, pad.., free.. ]
@@ -42,8 +40,8 @@ u64 MoveBlob(u64 ref) {
   }
 
   // Old: [ ..., nBytes, byte0, ..., byteN, pad.., ... ]
-  assert(IsFixnum(old_header));
-  u64 bytes_in_blob = UnboxFixnum(old_header);
+  assert(IsBlobHeader(old_header));
+  u64 bytes_in_blob = UnboxBlobHeader(old_header);
   u64 num_objects = NumObjectsPerBlob(bytes_in_blob);
   printf("    MoveBlob: moving blob of size %llu bytes, (%llu objects)\n", bytes_in_blob, num_objects);
 
@@ -59,13 +57,13 @@ u64 MoveBlob(u64 ref) {
 }
 
 
+u64 NumObjectsPerBlob(u64 bytes_in_blob) {
+  // number of objects required to hold at least bytes_in_blob + 1 for the header
+  return 1 + CeilingU64(bytes_in_blob, sizeof(Object));
+}
+
 
 // Returns ceiling(numerator/denominator)
 u64 CeilingU64(u64 numerator, u64 denominator) {
   return (numerator + denominator - 1) / denominator;
-}
-
-u64 NumObjectsPerBlob(u64 bytes_in_blob) {
-  // number of objects required to hold at least bytes_in_blob + 1 for the header
-  return 1 + CeilingU64(bytes_in_blob, sizeof(Object));
 }

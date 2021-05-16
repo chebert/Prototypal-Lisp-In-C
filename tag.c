@@ -85,6 +85,7 @@ b64 HasTag(Object object, enum Tag tag) {
 }
 
 b64 IsBrokenHeart(Object object) { return HasTag(object, TAG_BROKEN_HEART); }
+b64 IsBlobHeader(Object object)  { return HasTag(object, TAG_BLOB_HEADER); }
 b64 IsFixnum(Object object)      { return HasTag(object, TAG_FIXNUM); }
 b64 IsTrue(Object object)        { return HasTag(object, TAG_TRUE); }
 b64 IsFalse(Object object)       { return HasTag(object, TAG_FALSE); }
@@ -108,9 +109,9 @@ Object TagPayload(u64 payload, enum Tag tag) {
   return TAGGED_OBJECT_MASK | SHIFT_LEFT(tag, TAG_SHIFT) | payload;
 }
 
-Object nil          = TAGGED_OBJECT_MASK | SHIFT_LEFT(TAG_NIL,          TAG_SHIFT);
-Object true         = TAGGED_OBJECT_MASK | SHIFT_LEFT(TAG_TRUE,         TAG_SHIFT);
-Object false        = TAGGED_OBJECT_MASK | SHIFT_LEFT(TAG_FALSE,        TAG_SHIFT);
+Object nil   = TAGGED_OBJECT_MASK | SHIFT_LEFT(TAG_NIL,   TAG_SHIFT);
+Object true  = TAGGED_OBJECT_MASK | SHIFT_LEFT(TAG_TRUE,  TAG_SHIFT);
+Object false = TAGGED_OBJECT_MASK | SHIFT_LEFT(TAG_FALSE, TAG_SHIFT);
 
 // TODO: Maintain sign when truncating?
 Object BoxFixnum(s64 fixnum)        { return TagPayload(PAYLOAD_MASK & fixnum, TAG_FIXNUM); }
@@ -122,8 +123,9 @@ Object BoxByteVector(u64 reference) { return TagPayload(PAYLOAD_MASK & reference
 Object BoxString(u64 reference)     { return TagPayload(PAYLOAD_MASK & reference, TAG_STRING); }
 Object BoxSymbol(u64 reference)     { return TagPayload(PAYLOAD_MASK & reference, TAG_SYMBOL); }
 
-Object BoxReal64(real64 value) { return Real64ToU64(value); }
-Object BoxBrokenHeart(u64 num_bytes) { return TagPayload(num_bytes, TAG_BROKEN_HEART); }
+Object BoxReal64(real64 value)       { return Real64ToU64(value); }
+Object BoxBrokenHeart(u64 reference) { return TagPayload(reference, TAG_BROKEN_HEART); }
+Object BoxBlobHeader(u64 num_bytes)  { return TagPayload(num_bytes, TAG_BLOB_HEADER); }
 
 s64 UnboxFixnum(Object object) {
   u64 sign_bit_mask = SHIFT_LEFT(1, TAG_SHIFT-1); 
@@ -135,10 +137,11 @@ s64 UnboxFixnum(Object object) {
     : (s64)(PAYLOAD_MASK & object);
 }
 
-b64    UnboxBoolean(Object object)     { return IsFalse(object) ? 0 : 1; }
-real32 UnboxReal32(Object object)      { return U32ToReal32((u32)(0xffffffff & object)); }
-real64 UnboxReal64(Object object)      { return U64ToReal64(object); }
-u64    UnboxReference(Object object)   { return (PAYLOAD_MASK & object); }
+b64    UnboxBoolean(Object object)    { return IsFalse(object) ? 0 : 1; }
+real32 UnboxReal32(Object object)     { return U32ToReal32((u32)(0xffffffff & object)); }
+real64 UnboxReal64(Object object)     { return U64ToReal64(object); }
+u64    UnboxReference(Object object)  { return (PAYLOAD_MASK & object); }
+u64    UnboxBlobHeader(Object object) { return (PAYLOAD_MASK & object); }
 
 // Just for testing.
 s64 TwosComplement(u64 value) { return (s64)(~value + 1); }

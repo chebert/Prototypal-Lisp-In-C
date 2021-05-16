@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "memory.h"
 #include "read_buffer.h"
@@ -113,6 +114,7 @@ b64 IsCloseList(int ch) { return ch == ')'; }
 
 b64 IsWhitespace(int ch) { return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\v' || ch == '\f'; }
 b64 IsEof(int ch) { return ch == EOF; }
+b64 IsEscape(int ch) { return ch == '\\'; }
 
 struct ParseState MakeParseState();
 int ReadChar(struct Stream *stream, struct ParseState* state);
@@ -123,6 +125,7 @@ Object ReadObject(struct Stream *stream, struct ParseState *state);
 Object ReadQuote(struct Stream *stream, struct ParseState *state);
 Object ReadString(struct Stream *stream, struct ParseState *state);
 Object ReadHash(struct Stream *stream, struct ParseState *state);
+Object ReadSignedNumberOrSymbol(struct Stream *stream, struct ParseState *state);
 Object ReadNumberOrSymbol(struct Stream *stream, struct ParseState *state);
 Object ReadFloatingPointOrSymbol(struct Stream *stream, struct ParseState *state);
 Object ReadFloatingPoint2OrSymbol(struct Stream *stream, struct ParseState *state);
@@ -160,7 +163,9 @@ Object ReadObject(struct Stream *stream, struct ParseState *state) {
     return ReadString(stream, state);
   } else if (IsHash(next)) {
     return ReadHash(stream, state);
-  } else if (IsNumberSign(next) || IsDigit(next)) {
+  } else if (IsNumberSign(next)) {
+    return ReadSignedNumberOrSymbol(stream, state);
+  } else if (IsDigit(next)) {
     return ReadNumberOrSymbol(stream, state);
   } else if (IsDecimalPoint(next)) {
     return ReadFloatingPointOrSymbol(stream, state);
@@ -182,22 +187,26 @@ int ReadCharIgnoringWhitespace(struct Stream *stream, struct ParseState *state) 
 }
 
 Object ReadQuote(struct Stream *stream, struct ParseState *state) { return nil; }
-Object ReadHash(struct Stream *stream, struct ParseState *state) { return nil; }
+Object ReadSignedNumberOrSymbol(struct Stream *stream, struct ParseState *state) { return nil; }
 Object ReadNumberOrSymbol(struct Stream *stream, struct ParseState *state) { return nil; }
 Object ReadFloatingPointOrSymbol(struct Stream *stream, struct ParseState *state) { return nil; }
 Object ReadFloatingPoint2OrSymbol(struct Stream *stream, struct ParseState *state) { return nil; }
 Object ReadListLike(struct Stream *stream, struct ParseState *state) { return nil; }
 
+int HandleEscape(struct Stream *stream, struct ParseState *state, int next) {
+  if (IsEscape(next)) {
+    next = ReadChar(stream, state);
+    assert(!IsEof(next));
+  }
+  return next;
+}
+
 Object ReadString(struct Stream *stream, struct ParseState *state) {
   ResetReadBuffer(256);
-  for (int next = state->last_char;
+  for (int next = ReadChar(stream, state);
       !(IsStringQuote(next) || IsEof(next));
-      next = GetChar(stream)) {
-    if (IsEscapeChar(next)) {
-      next = GetChar(stream);
-      assert(!IsEof(next));
-    }
-    AppendReadBuffer(next);
+      next = ReadChar(stream, state)) {
+    AppendReadBuffer(HandleEscape(stream, state, next));
   }
   return FinalizeReadBuffer();
 }
@@ -206,35 +215,57 @@ Object ReadSymbol(struct Stream *stream, struct ParseState *state) {
   ResetReadBuffer(256);
   for (int next = state->last_char;
       !(IsCloseList(next) || IsWhitespace(next) || IsEof(next));
-      next = GetChar(stream)) {
-    if (IsEscapeChar(next)) {
-      next = GetChar(stream);
-      assert(!IsEof(next));
-    }
-    AppendReadBuffer(next);
+      next = ReadChar(stream, state)) {
+    AppendReadBuffer(HandleEscape(stream, state, next));
   }
   Object name = FinalizeReadBuffer();
   return InternSymbol(name);
 }
 
+Object ReadHash(struct Stream *stream, struct ParseState *state) {
+  ResetReadBuffer(256);
+
+  ReadChar(stream, state); // Discard the # when reading the symbol
+  Object symbol = ReadSymbol(stream, state);
+  u8 *string = StringCharacterBuffer(symbol);
+
+  if (!strcmp(string, "f")) return false;
+  if (!strcmp(string, "t")) return true;
+
+  printf("Invalid hash #%s\n", string);
+  assert(!"Invalid hash");
+}
+
 void TestParse() {
   InitializeMemory(128);
   InitializeSymbolTable(13);
+  // symbol
   struct Stream stream = MakeStringStream("   symbol  ");
   struct ParseState state = MakeParseState();
   Object object = ReadObject(&stream, &state);
   PrintlnObject(object);
 
-  stream = MakeStringStream("   \"Hello\" world\"  ");
+  // "Hello \"world\""
+  stream = MakeStringStream("   \"Hello \\\"world\\\"\"  ");
   state = MakeParseState();
-  Object object = ReadObject(&stream, &state);
+  object = ReadObject(&stream, &state);
+  PrintlnObject(object);
+
+  stream = MakeStringStream("  #f ");
+  state = MakeParseState();
+  object = ReadObject(&stream, &state);
+  PrintlnObject(object);
+
+  stream = MakeStringStream("  #t ");
+  state = MakeParseState();
+  object = ReadObject(&stream, &state);
   PrintlnObject(object);
 }
 
 int main(int argc, char** argv) {
-  //TestTag();
-  //TestMemory();
-  //TestSymbolTable();
-  //TestReadBuffer();
+  TestTag();
+  TestMemory();
+  TestSymbolTable();
+  TestReadBuffer();
   TestParse();
 }

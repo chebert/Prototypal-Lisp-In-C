@@ -17,4 +17,7 @@ u64 AllocateBlob(u64 num_bytes);
 
 u64 MoveBlob(u64 ref);
 
+// Returns the number of Objects in a Blob (including header)
+u64 NumObjectsPerBlob(u64 bytes_in_blob);
+
 #endif
