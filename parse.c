@@ -3,10 +3,11 @@
 #include <assert.h>
 #include <stdio.h>
 
-#include "tag.h"
 #include "memory.h"
-#include "symbol_table.h"
 #include "read_buffer.h"
+#include "string.h"
+#include "symbol_table.h"
+#include "tag.h"
 
 
 // Object := floating-point
@@ -82,7 +83,7 @@ int GetChar(struct Stream *stream) {
     struct StringStream *ss = &stream->as.string_stream;
     char value = ss->string[ss->position++];
     // the end of the string is considered EOF.
-    if (!value) return EOF;
+    if (value == 0) return EOF;
     return value;
   } else {
     assert(!"Invalid stream type");
@@ -97,17 +98,21 @@ struct Stream MakeStringStream(const char *string) {
   return stream;
 }
 
-b64 IsSignChar(int ch) { return ch == '+' || ch == '-'; }
-b64 IsDigitChar(int ch) {return ch >= '0' && ch <= '9'; }
-b64 IsQuote(int ch) { return ch == '\''; }
-b64 IsDoubleQuote(int ch) { return ch == '"'; }
-b64 IsHash(int ch) { return ch == '#'; }
-b64 IsOpenParen(int ch) { return ch == '('; }
-b64 IsCloseParen(int ch) { return ch == '('; }
+b64 IsNumberSign(int ch) { return ch == '+' || ch == '-'; }
+b64 IsDigit(int ch) {return ch >= '0' && ch <= '9'; }
 b64 IsDecimalPoint(int ch) { return ch == '.'; }
 b64 IsExponentMarker(int ch) { return ch == 'e' || ch == 'E' || ch == 'f' || ch == 'F' || ch == 'd' || ch == 'D'; }
-b64 IsEof(int ch) { return ch == EOF; }
+
+b64 IsSymbolicQuote(int ch) { return ch == '\''; }
+b64 IsStringQuote(int ch) { return ch == '"'; }
+
+b64 IsHash(int ch) { return ch == '#'; }
+
+b64 IsOpenList(int ch) { return ch == '('; }
+b64 IsCloseList(int ch) { return ch == ')'; }
+
 b64 IsWhitespace(int ch) { return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\v' || ch == '\f'; }
+b64 IsEof(int ch) { return ch == EOF; }
 
 struct ParseState MakeParseState();
 int ReadChar(struct Stream *stream, struct ParseState* state);
@@ -149,19 +154,19 @@ Object ReadObject(struct Stream *stream, struct ParseState *state) {
   int next = ReadCharIgnoringWhitespace(stream, state);
   if (IsEof(next)) {
     return nil;
-  } else if (IsQuote(next)) {
+  } else if (IsSymbolicQuote(next)) {
     return ReadQuote(stream, state);
-  } else if (IsDoubleQuote(next)) {
+  } else if (IsStringQuote(next)) {
     return ReadString(stream, state);
   } else if (IsHash(next)) {
     return ReadHash(stream, state);
-  } else if (IsSignChar(next) || IsDigitChar(next)) {
+  } else if (IsNumberSign(next) || IsDigit(next)) {
     return ReadNumberOrSymbol(stream, state);
   } else if (IsDecimalPoint(next)) {
     return ReadFloatingPointOrSymbol(stream, state);
   } else if (IsExponentMarker(next)) {
     return ReadFloatingPoint2OrSymbol(stream, state);
-  } else if (IsOpenParen(next)) {
+  } else if (IsOpenList(next)) {
     return ReadListLike(stream, state);
   } else {
     return ReadSymbol(stream, state);
@@ -185,22 +190,29 @@ Object ReadFloatingPoint2OrSymbol(struct Stream *stream, struct ParseState *stat
 Object ReadListLike(struct Stream *stream, struct ParseState *state) { return nil; }
 
 Object ReadSymbol(struct Stream *stream, struct ParseState *state) {
-  return nil;
+  ResetReadBuffer(256);
+  for (int next = state->last_char;
+      !(IsCloseList(next) || IsWhitespace(next) || IsEof(next));
+      next = GetChar(stream)) {
+    AppendReadBuffer(next);
+  }
+  Object name = FinalizeReadBuffer();
+  return InternSymbol(name);
 }
 
 void TestParse() {
-  /*
   InitializeMemory(128);
+  InitializeSymbolTable(13);
   struct Stream stream = MakeStringStream("   symbol  ");
   struct ParseState state = MakeParseState();
   Object object = ReadObject(&stream, &state);
-  */
+  PrintlnObject(object);
 }
 
 int main(int argc, char** argv) {
-  TestTag();
-  TestMemory();
-  TestSymbolTable();
-  TestReadBuffer();
-  //TestParse();
+  //TestTag();
+  //TestMemory();
+  //TestSymbolTable();
+  //TestReadBuffer();
+  TestParse();
 }
