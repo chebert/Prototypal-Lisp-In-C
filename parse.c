@@ -127,8 +127,6 @@ Object ReadString(struct Stream *stream, struct ParseState *state);
 Object ReadHash(struct Stream *stream, struct ParseState *state);
 Object ReadSignedNumberOrSymbol(struct Stream *stream, struct ParseState *state);
 Object ReadNumberOrSymbol(struct Stream *stream, struct ParseState *state);
-Object ReadFloatingPointOrSymbol(struct Stream *stream, struct ParseState *state);
-Object ReadFloatingPoint2OrSymbol(struct Stream *stream, struct ParseState *state);
 Object ReadListLike(struct Stream *stream, struct ParseState *state);
 Object ReadSymbol(struct Stream *stream, struct ParseState *state);
 
@@ -169,8 +167,6 @@ Object ReadObject(struct Stream *stream, struct ParseState *state) {
     return ReadNumberOrSymbol(stream, state);
   } else if (IsDecimalPoint(next)) {
     return ReadFloatingPointOrSymbol(stream, state);
-  } else if (IsExponentMarker(next)) {
-    return ReadFloatingPoint2OrSymbol(stream, state);
   } else if (IsOpenList(next)) {
     return ReadListLike(stream, state);
   } else {
@@ -186,11 +182,13 @@ int ReadCharIgnoringWhitespace(struct Stream *stream, struct ParseState *state) 
   return next;
 }
 
-Object ReadQuote(struct Stream *stream, struct ParseState *state) { return nil; }
 Object ReadSignedNumberOrSymbol(struct Stream *stream, struct ParseState *state) { return nil; }
 Object ReadNumberOrSymbol(struct Stream *stream, struct ParseState *state) { return nil; }
 Object ReadFloatingPointOrSymbol(struct Stream *stream, struct ParseState *state) { return nil; }
-Object ReadFloatingPoint2OrSymbol(struct Stream *stream, struct ParseState *state) { return nil; }
+
+Object ReadQuote(struct Stream *stream, struct ParseState *state) {
+  return ReadObject(stream, state);
+}
 Object ReadListLike(struct Stream *stream, struct ParseState *state) { return nil; }
 
 int HandleEscape(struct Stream *stream, struct ParseState *state, int next) {

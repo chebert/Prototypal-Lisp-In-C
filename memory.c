@@ -47,6 +47,8 @@ void CollectGarbage() {
   for (u64 scan = 0; scan < memory.free; ++scan) {
     printf("CollectGarbage: Scanning object at %llu. Free=%llu\n", scan, memory.free);
     Object object = memory.new_objects[scan];
+
+    // If the object is a blob, we can't scan its contents
     if (IsBlobHeader(object)) {
       u64 num_objects = NumObjectsPerBlob(UnboxBlobHeader(object));
       scan += num_objects;
