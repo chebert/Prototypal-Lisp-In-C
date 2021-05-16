@@ -182,18 +182,35 @@ int ReadCharIgnoringWhitespace(struct Stream *stream, struct ParseState *state) 
 }
 
 Object ReadQuote(struct Stream *stream, struct ParseState *state) { return nil; }
-Object ReadString(struct Stream *stream, struct ParseState *state) { return nil; }
 Object ReadHash(struct Stream *stream, struct ParseState *state) { return nil; }
 Object ReadNumberOrSymbol(struct Stream *stream, struct ParseState *state) { return nil; }
 Object ReadFloatingPointOrSymbol(struct Stream *stream, struct ParseState *state) { return nil; }
 Object ReadFloatingPoint2OrSymbol(struct Stream *stream, struct ParseState *state) { return nil; }
 Object ReadListLike(struct Stream *stream, struct ParseState *state) { return nil; }
 
+Object ReadString(struct Stream *stream, struct ParseState *state) {
+  ResetReadBuffer(256);
+  for (int next = state->last_char;
+      !(IsStringQuote(next) || IsEof(next));
+      next = GetChar(stream)) {
+    if (IsEscapeChar(next)) {
+      next = GetChar(stream);
+      assert(!IsEof(next));
+    }
+    AppendReadBuffer(next);
+  }
+  return FinalizeReadBuffer();
+}
+
 Object ReadSymbol(struct Stream *stream, struct ParseState *state) {
   ResetReadBuffer(256);
   for (int next = state->last_char;
       !(IsCloseList(next) || IsWhitespace(next) || IsEof(next));
       next = GetChar(stream)) {
+    if (IsEscapeChar(next)) {
+      next = GetChar(stream);
+      assert(!IsEof(next));
+    }
     AppendReadBuffer(next);
   }
   Object name = FinalizeReadBuffer();
@@ -205,6 +222,11 @@ void TestParse() {
   InitializeSymbolTable(13);
   struct Stream stream = MakeStringStream("   symbol  ");
   struct ParseState state = MakeParseState();
+  Object object = ReadObject(&stream, &state);
+  PrintlnObject(object);
+
+  stream = MakeStringStream("   \"Hello\" world\"  ");
+  state = MakeParseState();
   Object object = ReadObject(&stream, &state);
   PrintlnObject(object);
 }
