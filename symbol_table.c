@@ -28,6 +28,10 @@ Object Reverse(Object list);
 // Return the global symbol table
 Object GetSymbolTable();
 
+void InitializeSymbolTable(u64 size) {
+  SetRegister(REGISTER_SYMBOL_TABLE, MakeSymbolTable(size));
+}
+
 // A Symbol table is a Hashed set, represented as a vector of Symbol Lists
 Object MakeSymbolTable(u64 size) {
   return AllocateVector(size);
@@ -147,7 +151,7 @@ void TestSymbolTable() {
   assert(HashString("symbol") == 2905944654);
 
   InitializeMemory(128);
-  SetRegister(REGISTER_SYMBOL_TABLE, MakeSymbolTable(13));
+  InitializeSymbolTable(13);
 
   Object symbol = FindSymbol("symbol");
   assert(symbol == nil);
@@ -165,7 +169,7 @@ void TestSymbolTable() {
 
   DestroyMemory();
   InitializeMemory(128);
-  SetRegister(REGISTER_SYMBOL_TABLE, MakeSymbolTable(1));
+  InitializeSymbolTable(1);
   InternSymbol("symbol");
   InternSymbol("dimple");
   InternSymbol("pimple");
