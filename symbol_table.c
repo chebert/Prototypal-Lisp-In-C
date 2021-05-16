@@ -54,8 +54,10 @@ Object InternSymbol(const char *name) {
   // Symbol not found
   // Create a new symbol and add it to the symbol list
   Object new_symbol = AllocateSymbol(name);
+  // REFERENCES INVALIDATED
   Object old_symbols = VectorRef(GetSymbolTable(), index);
   Object new_symbols = MakePair(new_symbol, old_symbols);
+  // REFERENCES INVALIDATED
 
   VectorSet(GetSymbolTable(), index, new_symbols);
 
@@ -88,8 +90,8 @@ Object RemoveSymbolDestructively(Object symbols, const char *name) {
     // CASE: (symbol . rest)
     return Rest(symbols);
   } else {
-    // CASE: element may be somewhere in the rest of the list.
-    // symbols := (not-symbol . rest)
+    // CASE: (not-symbol . rest)
+    // Symbol may be in rest.
     Object result = symbols;
 
     // prev := (not-symbol . rest)
