@@ -114,15 +114,15 @@ int ReadChar(struct Stream *stream, struct ParseState* state);
 int PeekChar(struct Stream *stream, struct ParseState* state);
 
 int ReadCharIgnoringWhitespace(struct Stream *stream, struct ParseState *state);
-Object ReadObject(struct Memory *memory, struct Stream *stream, struct ParseState *state);
-Object ReadQuote(struct Memory *memory, struct Stream *stream, struct ParseState *state);
-Object ReadString(struct Memory *memory, struct Stream *stream, struct ParseState *state);
-Object ReadHash(struct Memory *memory, struct Stream *stream, struct ParseState *state);
-Object ReadNumberOrSymbol(struct Memory *memory, struct Stream *stream, struct ParseState *state);
-Object ReadFloatingPointOrSymbol(struct Memory *memory, struct Stream *stream, struct ParseState *state);
-Object ReadFloatingPoint2OrSymbol(struct Memory *memory, struct Stream *stream, struct ParseState *state);
-Object ReadListLike(struct Memory *memory, struct Stream *stream, struct ParseState *state);
-Object ReadSymbol(struct Memory *memory, struct Stream *stream, struct ParseState *state);
+Object ReadObject(struct Stream *stream, struct ParseState *state);
+Object ReadQuote(struct Stream *stream, struct ParseState *state);
+Object ReadString(struct Stream *stream, struct ParseState *state);
+Object ReadHash(struct Stream *stream, struct ParseState *state);
+Object ReadNumberOrSymbol(struct Stream *stream, struct ParseState *state);
+Object ReadFloatingPointOrSymbol(struct Stream *stream, struct ParseState *state);
+Object ReadFloatingPoint2OrSymbol(struct Stream *stream, struct ParseState *state);
+Object ReadListLike(struct Stream *stream, struct ParseState *state);
+Object ReadSymbol(struct Stream *stream, struct ParseState *state);
 
 struct ParseState MakeParseState() {
   struct ParseState state;
@@ -145,26 +145,26 @@ int ReadChar(struct Stream *stream, struct ParseState* state) {
   return next;
 }
 
-Object ReadObject(struct Memory *memory, struct Stream *stream, struct ParseState *state) {
+Object ReadObject(struct Stream *stream, struct ParseState *state) {
   int next = ReadCharIgnoringWhitespace(stream, state);
   if (IsEof(next)) {
     return nil;
   } else if (IsQuote(next)) {
-    return ReadQuote(memory, stream, state);
+    return ReadQuote(stream, state);
   } else if (IsDoubleQuote(next)) {
-    return ReadString(memory, stream, state);
+    return ReadString(stream, state);
   } else if (IsHash(next)) {
-    return ReadHash(memory, stream, state);
+    return ReadHash(stream, state);
   } else if (IsSignChar(next) || IsDigitChar(next)) {
-    return ReadNumberOrSymbol(memory, stream, state);
+    return ReadNumberOrSymbol(stream, state);
   } else if (IsDecimalPoint(next)) {
-    return ReadFloatingPointOrSymbol(memory, stream, state);
+    return ReadFloatingPointOrSymbol(stream, state);
   } else if (IsExponentMarker(next)) {
-    return ReadFloatingPoint2OrSymbol(memory, stream, state);
+    return ReadFloatingPoint2OrSymbol(stream, state);
   } else if (IsOpenParen(next)) {
-    return ReadListLike(memory, stream, state);
+    return ReadListLike(stream, state);
   } else {
-    return ReadSymbol(memory, stream, state);
+    return ReadSymbol(stream, state);
   }
   ++state->sub_forms;
 }
@@ -176,23 +176,23 @@ int ReadCharIgnoringWhitespace(struct Stream *stream, struct ParseState *state) 
   return next;
 }
 
-Object ReadQuote(struct Memory *memory, struct Stream *stream, struct ParseState *state) { return nil; }
-Object ReadString(struct Memory *memory, struct Stream *stream, struct ParseState *state) { return nil; }
-Object ReadHash(struct Memory *memory, struct Stream *stream, struct ParseState *state) { return nil; }
-Object ReadNumberOrSymbol(struct Memory *memory, struct Stream *stream, struct ParseState *state) { return nil; }
-Object ReadFloatingPointOrSymbol(struct Memory *memory, struct Stream *stream, struct ParseState *state) { return nil; }
-Object ReadFloatingPoint2OrSymbol(struct Memory *memory, struct Stream *stream, struct ParseState *state) { return nil; }
-Object ReadListLike(struct Memory *memory, struct Stream *stream, struct ParseState *state) { return nil; }
+Object ReadQuote(struct Stream *stream, struct ParseState *state) { return nil; }
+Object ReadString(struct Stream *stream, struct ParseState *state) { return nil; }
+Object ReadHash(struct Stream *stream, struct ParseState *state) { return nil; }
+Object ReadNumberOrSymbol(struct Stream *stream, struct ParseState *state) { return nil; }
+Object ReadFloatingPointOrSymbol(struct Stream *stream, struct ParseState *state) { return nil; }
+Object ReadFloatingPoint2OrSymbol(struct Stream *stream, struct ParseState *state) { return nil; }
+Object ReadListLike(struct Stream *stream, struct ParseState *state) { return nil; }
 
-Object ReadSymbol(struct Memory *memory, struct Stream *stream, struct ParseState *state) {
+Object ReadSymbol(struct Stream *stream, struct ParseState *state) {
   return nil;
 }
 
 void TestParse() {
-  struct Memory memory = InitializeMemory(128, 13);
+  InitializeMemory(128, 13);
   struct Stream stream = MakeStringStream("   symbol  ");
   struct ParseState state = MakeParseState();
-  Object object = ReadObject(&memory, &stream, &state);
+  Object object = ReadObject(&stream, &state);
 }
 
 int main(int argc, char** argv) {

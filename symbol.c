@@ -3,18 +3,19 @@
 #include <stdio.h>
 
 #include "blob.h"
+#include "memory.h"
 #include "string.h"
 
-Object MoveSymbol(struct Memory *memory, u64 ref) { 
-  return BoxSymbol(MoveBlob(memory, ref));
+Object MoveSymbol(u64 ref) { 
+  return BoxSymbol(MoveBlob(ref));
 }
 
-Object AllocateSymbol(struct Memory *memory, const char *name) {
-  return BoxSymbol(AllocateString(memory, name));
+Object AllocateSymbol(const char *name) {
+  return BoxSymbol(AllocateString(name));
 }
 
-void PrintSymbol(struct Memory *memory, Object symbol) {
+void PrintSymbol(Object symbol) {
   u64 reference = UnboxReference(symbol);
   // TODO: Print escaping characters
-  printf("%s", (const char*)&memory->the_objects[reference+1]);
+  printf("%s", (const char*)&memory.the_objects[reference+1]);
 }

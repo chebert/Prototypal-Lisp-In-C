@@ -51,24 +51,25 @@ struct Memory {
   // The total number of objects that have been copied due to GCs.
   u64 num_objects_moved;
 };
+extern struct Memory memory;
 
 // Allocate memory needed to store up to max_objects.
-struct Memory InitializeMemory(u64 max_objects, u64 symbol_table_size);
-void DestroyMemory(struct Memory *memory);
+void InitializeMemory(u64 max_objects, u64 symbol_table_size);
+void DestroyMemory();
 
 // Perform a compacting garbage collection on the objects in memory
-void CollectGarbage(struct Memory *memory);
+void CollectGarbage();
 
 // Performs a garbage collection if there isn't enough memory.
 // If there still isn't enough memory, causes an exception.
-void EnsureEnoughMemory(struct Memory *memory, u64 num_objects_required);
+void EnsureEnoughMemory(u64 num_objects_required);
 
 // Warning: Every time you Allocate, all references in C code may be invalid.
 
 // Print an object, following references.
-void PrintObject(struct Memory *memory, Object object);
+void PrintObject(Object object);
 // Print an object, following references, followed by a newline.
-void PrintlnObject(struct Memory *memory, Object object);
+void PrintlnObject(Object object);
 
 void TestMemory();
 

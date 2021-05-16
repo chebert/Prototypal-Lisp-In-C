@@ -4,89 +4,90 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "memory.h"
 #include "pair.h"
 #include "root.h"
 #include "symbol.h"
 #include "vector.h"
 
 // Returns the first object in a list
-Object First(struct Memory *memory, Object pair);
+Object First(Object pair);
 // Returns the rest of a list given a pair.
-Object Rest(struct Memory *memory, Object pair);
+Object Rest(Object pair);
 
 // Returns true if the string object is deep equal to c_string.
-b64 IsSymbolEqual(struct Memory *memory, Object symbol, const char *name);
+b64 IsSymbolEqual(Object symbol, const char *name);
 
 // Returns the index into the symbol_table where name belongs.
-u64 GetSymbolListIndex(struct Memory *memory, Object symbol_table, const char *name);
+u64 GetSymbolListIndex(Object symbol_table, const char *name);
 // Returns the symbol or nil.
-Object FindSymbolInSymbolList(struct Memory *memory, Object symbol_table, u64 index, const char *name);
+Object FindSymbolInSymbolList(Object symbol_table, u64 index, const char *name);
 // Removes symbol with the given name from the list of symbols.
 // Returns the updated symbols list.
-Object RemoveSymbolDestructively(struct Memory *memory, Object symbols, const char *name);
+Object RemoveSymbolDestructively(Object symbols, const char *name);
 // Returns a list of list_b appended to the end of list_a
-Object Append(struct Memory *memory, Object list_a, Object list_b);
+Object Append(Object list_a, Object list_b);
 // Returns list but reversed.
-Object Reverse(struct Memory *memory, Object list);
+Object Reverse(Object list);
 
 // Return the global symbol table
-Object GetSymbolTable(struct Memory *memory);
+Object GetSymbolTable();
 
 // A Symbol table is a Hashed set, represented as a vector of Symbol Lists
-Object MakeSymbolTable(struct Memory *memory, u64 size) {
-  return AllocateVector(memory, size);
+Object MakeSymbolTable(u64 size) {
+  return AllocateVector(size);
 }
 
 
-Object FindSymbol(struct Memory *memory, const char *name) {
-  Object symbol_table = GetSymbolTable(memory);
-  u64 index = GetSymbolListIndex(memory, symbol_table, name);
-  return FindSymbolInSymbolList(memory, symbol_table, index, name);
+Object FindSymbol(const char *name) {
+  Object symbol_table = GetSymbolTable();
+  u64 index = GetSymbolListIndex(symbol_table, name);
+  return FindSymbolInSymbolList(symbol_table, index, name);
 }
 
-Object InternSymbol(struct Memory *memory, const char *name) {
-  Object symbol_table = GetSymbolTable(memory);
-  u64 index = GetSymbolListIndex(memory, symbol_table, name);
-  Object found = FindSymbolInSymbolList(memory, symbol_table, index, name);
+Object InternSymbol(const char *name) {
+  Object symbol_table = GetSymbolTable();
+  u64 index = GetSymbolListIndex(symbol_table, name);
+  Object found = FindSymbolInSymbolList(symbol_table, index, name);
   if (found != nil)
     return found;
 
   // Symbol not found
   // Create a new symbol and add it to the symbol list
-  Object new_symbol = AllocateSymbol(memory, name);
-  Object old_symbols = VectorRef(memory, UnboxReference(GetSymbolTable(memory)), index);
-  Object new_symbols = MakePair(memory, new_symbol, old_symbols);
+  Object new_symbol = AllocateSymbol(name);
+  Object old_symbols = VectorRef(UnboxReference(GetSymbolTable()), index);
+  Object new_symbols = MakePair(new_symbol, old_symbols);
 
-  VectorSet(memory, UnboxReference(GetSymbolTable(memory)), index, new_symbols);
+  VectorSet(UnboxReference(GetSymbolTable()), index, new_symbols);
 
-  return FindSymbol(memory, name);
+  return FindSymbol(name);
 }
 
-void UninternSymbol(struct Memory *memory, const char *name) {
-  Object symbol_table = GetSymbolTable(memory);
-  u64 index = GetSymbolListIndex(memory, symbol_table, name);
-  Object symbols = VectorRef(memory, UnboxReference(symbol_table), index);
+void UninternSymbol(const char *name) {
+  Object symbol_table = GetSymbolTable();
+  u64 index = GetSymbolListIndex(symbol_table, name);
+  Object symbols = VectorRef(UnboxReference(symbol_table), index);
 
-  Object new_symbols = RemoveSymbolDestructively(memory, symbols, name);
-  VectorSet(memory, UnboxReference(symbol_table), index, new_symbols);
+  Object new_symbols = RemoveSymbolDestructively(symbols, name);
+  VectorSet(UnboxReference(symbol_table), index, new_symbols);
 }
 
 
 // Helpers
 
-u64 GetSymbolListIndex(struct Memory *memory, Object symbol_table, const char *name) {
+u64 GetSymbolListIndex(Object symbol_table, const char *name) {
   u32 hash = HashString(name);
-  s64 length = VectorLength(memory, UnboxReference(symbol_table));
+  s64 length = VectorLength(UnboxReference(symbol_table));
   return hash % length;
 }
 
-Object RemoveSymbolDestructively(struct Memory *memory, Object symbols, const char *name) {
+Object RemoveSymbolDestructively(Object symbols, const char *name) {
   if (symbols == nil) {
     // CASE: ()
     return nil;
-  } else if (IsSymbolEqual(memory, First(memory, symbols), name)) {
+  } else if (IsSymbolEqual(First(symbols), name)) {
     // CASE: (symbol . rest)
-    return Rest(memory, symbols);
+    return Rest(symbols);
   } else {
     // CASE: element may be somewhere in the rest of the list.
     // symbols := (not-symbol . rest)
@@ -95,17 +96,17 @@ Object RemoveSymbolDestructively(struct Memory *memory, Object symbols, const ch
     // prev := (not-symbol . rest)
     // symbols := rest
     Object prev = symbols;
-    symbols = Rest(memory, symbols);
+    symbols = Rest(symbols);
 
-    for (; symbols != nil; prev = symbols, symbols = Rest(memory, symbols)) {
+    for (; symbols != nil; prev = symbols, symbols = Rest(symbols)) {
       // prev := (x . y . rest)
       // symbols := (y . rest)
 
-      Object symbol = First(memory, symbols);
-      if (IsSymbolEqual(memory, symbol, name)) {
+      Object symbol = First(symbols);
+      if (IsSymbolEqual(symbol, name)) {
         // prev := (x . symbol . rest)
         // symbols := (symbol . rest)
-        SetCdr(memory, UnboxReference(prev), Rest(memory, symbols));
+        SetCdr(UnboxReference(prev), Rest(symbols));
         // prev := (x . rest)
         return result;
       }
@@ -115,33 +116,33 @@ Object RemoveSymbolDestructively(struct Memory *memory, Object symbols, const ch
   }
 }
 
-Object FindSymbolInSymbolList(struct Memory *memory, Object symbol_table, u64 index, const char *name) {
-  for (Object symbols = VectorRef(memory, UnboxReference(symbol_table), index);
+Object FindSymbolInSymbolList(Object symbol_table, u64 index, const char *name) {
+  for (Object symbols = VectorRef(UnboxReference(symbol_table), index);
       symbols != nil;
-      symbols = Rest(memory, symbols)) {
-    Object symbol = First(memory, symbols);
-    if (IsSymbolEqual(memory, symbol, name))
+      symbols = Rest(symbols)) {
+    Object symbol = First(symbols);
+    if (IsSymbolEqual(symbol, name))
       return symbol;
   }
   return nil;
 }
 
-b64 IsSymbolEqual(struct Memory *memory, Object symbol, const char *name) {
+b64 IsSymbolEqual(Object symbol, const char *name) {
   assert(IsSymbol(symbol));
 
   u64 symbol_reference = UnboxReference(symbol);
-  char *symbol_string = (char*)&memory->the_objects[symbol_reference + 1];
+  char *symbol_string = (char*)&memory.the_objects[symbol_reference + 1];
 
   return strcmp(symbol_string, name) == 0;
 }
 
-Object First(struct Memory *memory, Object pair) {
+Object First(Object pair) {
   assert(IsPair(pair));
-  return Car(memory, UnboxReference(pair));
+  return Car(UnboxReference(pair));
 }
-Object Rest(struct Memory *memory, Object pair) {
+Object Rest(Object pair) {
   assert(IsPair(pair));
-  return Cdr(memory, UnboxReference(pair));
+  return Cdr(UnboxReference(pair));
 }
 
 // DJB2 algorithm by Dan Bernstein
@@ -152,38 +153,38 @@ u32 HashString(const u8 *str) {
   return hash;
 }
 
-Object GetSymbolTable(struct Memory *memory) {
-  return GetRegister(memory, REGISTER_SYMBOL_TABLE);
+Object GetSymbolTable() {
+  return GetRegister(REGISTER_SYMBOL_TABLE);
 }
 
 void TestSymbolTable() {
   assert(HashString("symbol") == 2905944654);
 
-  struct Memory memory = InitializeMemory(128, 13);
+  InitializeMemory(128, 13);
 
-  Object symbol = FindSymbol(&memory, "symbol");
+  Object symbol = FindSymbol("symbol");
   assert(symbol == nil);
 
-  symbol = InternSymbol(&memory, "symbol");
-  PrintlnObject(&memory, symbol);
+  symbol = InternSymbol("symbol");
+  PrintlnObject(symbol);
 
-  Object otherSymbol = FindSymbol(&memory, "symbol");
+  Object otherSymbol = FindSymbol("symbol");
   assert(symbol == otherSymbol);
-  otherSymbol = InternSymbol(&memory, "symbol");
+  otherSymbol = InternSymbol("symbol");
   assert(symbol == otherSymbol);
 
-  UninternSymbol(&memory, "symbol");
-  assert(FindSymbol(&memory, "symbol") == nil);
+  UninternSymbol("symbol");
+  assert(FindSymbol("symbol") == nil);
 
-  DestroyMemory(&memory);
-  memory = InitializeMemory(128, 1);
-  InternSymbol(&memory, "symbol");
-  InternSymbol(&memory, "dimple");
-  InternSymbol(&memory, "pimple");
-  InternSymbol(&memory, "limp-pole");
-  assert(FindSymbol(&memory, "symbol") != nil);
-  UninternSymbol(&memory, "dimple");
-  assert(FindSymbol(&memory, "dimple") == nil);
-  assert(FindSymbol(&memory, "symbol") != nil);
-  assert(FindSymbol(&memory, "pimple") != nil);
+  DestroyMemory();
+  InitializeMemory(128, 1);
+  InternSymbol("symbol");
+  InternSymbol("dimple");
+  InternSymbol("pimple");
+  InternSymbol("limp-pole");
+  assert(FindSymbol("symbol") != nil);
+  UninternSymbol("dimple");
+  assert(FindSymbol("dimple") == nil);
+  assert(FindSymbol("symbol") != nil);
+  assert(FindSymbol("pimple") != nil);
 }
