@@ -8,6 +8,8 @@
 // It is used to uniquely store references to symbols, so that they can be compared
 // for equality by testing to see if the references are equal, instead of a deep equality check.
 
+// TODO: InitializeSymbolTable(u64 size);
+
 u32 HashString(const u8 *str);
 Object MakeSymbolTable(u64 size);
 

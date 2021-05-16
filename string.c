@@ -18,7 +18,10 @@ Object MoveString(Object string) {
   return BoxString(MoveBlob(UnboxReference(string)));
 }
 
-void PrintString(Object object) {
-  u64 reference = UnboxReference(object);
-  printf("\"%s\"", (const char*)&memory.the_objects[reference+1]);
+void PrintString(Object string) {
+  printf("\"%s\"", (const char*)StringCharacterBuffer(string));
+}
+
+u8 *StringCharacterBuffer(Object string) {
+  return (u8*)&memory.the_objects[UnboxReference(string)+1];
 }

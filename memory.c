@@ -85,7 +85,7 @@ Object MoveObject(Object object) {
 
 Object MovePrimitive(Object object) { return object; }
 
-void InitializeMemory(u64 max_objects, u64 symbol_table_size) {
+void InitializeMemory(u64 max_objects) {
   memory.max_objects = max_objects;
   memory.num_collections = 0;
   memory.num_objects_allocated = 0;
@@ -101,7 +101,7 @@ void InitializeMemory(u64 max_objects, u64 symbol_table_size) {
   for (u64 i = 0; i < memory.max_objects; ++i) memory.the_objects[i] = nil;
   memory.free = 0;
 
-  InitializeRoot(symbol_table_size);
+  InitializeRoot();
 }
 
 void DestroyMemory() {
@@ -177,7 +177,7 @@ void PrintMemory() {
 }
 
 void TestMemory() {
-  InitializeMemory(32, 0);
+  InitializeMemory(32);
   MakePair(BoxFixnum(4), BoxFixnum(2));
   Object string = AllocateString("Hello");
 
@@ -216,7 +216,7 @@ void TestMemory() {
       memory.num_objects_moved * 1.0 / memory.num_collections);
 
   SetRegister(REGISTER_THE_OBJECT, nil);
-  SetRegister(REGISTER_THE_OBJECT, AllocateVector(29 - NUM_REGISTERS));
+  SetRegister(REGISTER_THE_OBJECT, AllocateVector(30 - NUM_REGISTERS));
   printf("Root: ");
   PrintlnObject(GetRegister(REGISTER_THE_OBJECT));
 }

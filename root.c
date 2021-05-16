@@ -4,9 +4,8 @@
 #include "symbol_table.h"
 #include "vector.h"
 
-void InitializeRoot(u64 symbol_table_size) {
+void InitializeRoot() {
   memory.root = AllocateVector(NUM_REGISTERS);
-  VectorSet(memory.root, REGISTER_SYMBOL_TABLE, MakeSymbolTable(symbol_table_size));
 }
 
 Object GetRegister(enum Register reg) {

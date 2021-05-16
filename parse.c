@@ -189,10 +189,12 @@ Object ReadSymbol(struct Stream *stream, struct ParseState *state) {
 }
 
 void TestParse() {
-  InitializeMemory(128, 13);
+  /*
+  InitializeMemory(128);
   struct Stream stream = MakeStringStream("   symbol  ");
   struct ParseState state = MakeParseState();
   Object object = ReadObject(&stream, &state);
+  */
 }
 
 int main(int argc, char** argv) {

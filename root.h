@@ -6,14 +6,14 @@
 // At the root of memory is a vector of registers, holding all of the data/references
 // needed for the program.
 
-void InitializeRoot(u64 symbol_table_size);
+void InitializeRoot();
 
 enum Register {
   REGISTER_SYMBOL_TABLE,
   REGISTER_THE_OBJECT,
   REGISTER_SAVED_CAR,
   REGISTER_SAVED_CDR,
-  REGISTER_ROPE_SAVE,
+  REGISTER_READ_BUFFER,
   NUM_REGISTERS,
 };
 

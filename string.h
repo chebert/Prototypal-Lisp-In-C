@@ -10,4 +10,8 @@ Object AllocateString(const char *string);
 Object MoveString(Object string);
 void PrintString(Object object);
 
+// Returns a U8 pointer from the start of the character buffer,
+// Valid only until the next garbage collection.
+u8 *StringCharacterBuffer(Object string);
+
 #endif

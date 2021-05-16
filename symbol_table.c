@@ -146,7 +146,8 @@ Object GetSymbolTable() {
 void TestSymbolTable() {
   assert(HashString("symbol") == 2905944654);
 
-  InitializeMemory(128, 13);
+  InitializeMemory(128);
+  SetRegister(REGISTER_SYMBOL_TABLE, MakeSymbolTable(13));
 
   Object symbol = FindSymbol("symbol");
   assert(symbol == nil);
@@ -163,7 +164,8 @@ void TestSymbolTable() {
   assert(FindSymbol("symbol") == nil);
 
   DestroyMemory();
-  InitializeMemory(128, 1);
+  InitializeMemory(128);
+  SetRegister(REGISTER_SYMBOL_TABLE, MakeSymbolTable(1));
   InternSymbol("symbol");
   InternSymbol("dimple");
   InternSymbol("pimple");
@@ -173,4 +175,5 @@ void TestSymbolTable() {
   assert(FindSymbol("dimple") == nil);
   assert(FindSymbol("symbol") != nil);
   assert(FindSymbol("pimple") != nil);
+  DestroyMemory();
 }

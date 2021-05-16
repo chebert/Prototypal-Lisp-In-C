@@ -3,23 +3,17 @@
 
 #include "tag.h"
 
-// A rope is a data structure which chains strings together, one after the other.
-// When the rope is unable to append a character, the rope is extended to have a new, empty string.
-// This enables the reading of unpredictably large strings/symbols,
-// without wasting space.
-//
-// Internally a rope is a list of strings.
-// A rope can be finalized into a single string.
+// Reset/initialize the read buffer.
+// Buffer size indicates how big the initial buffer should be,
+// as well as how much the buffer should grow by when the end is reached.
+// Recommended value: 256 (or some multiple of 8).
+void ResetReadBuffer(s64 buffer_size);
 
-// Construct a rope of strings.
-// rope := (string-size . strings-list)
-Object MakeRope(s64 string_size);
+// Append a character to the end of the read buffer.
+void AppendReadBuffer(u8 character);
 
-// Append a character to the end of the rope.
-void AppendRope(Object rope, u8 character);
-
-// Return a single string with all of the characters in rope copied into it.
-Object FinalizeRope(Object rope);
+// Return a single string with all of the characters in the read buffer copied into it.
+Object FinalizeReadBuffer();
 
 void TestRope();
 

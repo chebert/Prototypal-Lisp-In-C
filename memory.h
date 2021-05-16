@@ -54,7 +54,7 @@ struct Memory {
 extern struct Memory memory;
 
 // Allocate memory needed to store up to max_objects.
-void InitializeMemory(u64 max_objects, u64 symbol_table_size);
+void InitializeMemory(u64 max_objects);
 void DestroyMemory();
 
 // Perform a compacting garbage collection on the objects in memory
