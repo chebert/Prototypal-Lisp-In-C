@@ -18,20 +18,20 @@ b64 IsStringFull(Object rope_string, s64 string_size);
 
 Object MakeRope(s64 string_size) {
   Object rope = AllocatePair();
-  SetCar(UnboxReference(rope), BoxFixnum(string_size));
-  SetCdr(UnboxReference(rope), nil);
+  SetCar(rope, BoxFixnum(string_size));
+  SetCdr(rope, nil);
   return rope;
 }
 
 void AppendRope(Object rope, u8 character) {
-  s64 string_size = UnboxFixnum(Car(UnboxReference(rope)));
-  Object strings = Cdr(UnboxReference(rope));
+  s64 string_size = UnboxFixnum(Car(rope));
+  Object strings = Cdr(rope);
   if (strings == nil) {
     // this is the first character being added to the rope.
     AppendNewRopeString(rope, string_size, character);
   } else {
     Object end = LastCdr(strings);
-    Object last_string = Car(UnboxReference(end));
+    Object last_string = Car(end);
     if (IsStringFull(last_string, string_size)) {
       // The last rope_string is full, need to allocate a new rope_string, and append it to the end of the rope.
       AppendNewRopeString(end, string_size, character);
@@ -66,16 +66,16 @@ void AppendNewRopeString(Object last_pair, s64 string_size, u8 character) {
   Object pair = MakePair(MakeNewRopeString(string_size, character), nil);
   last_pair = GetRegister(REGISTER_ROPE_SAVE);
 
-  SetCdr(UnboxReference(last_pair), pair);
+  SetCdr(last_pair, pair);
 }
 
 s64 RopeStringLength(Object rope_string) {
-  return UnboxFixnum(Car(UnboxReference(rope_string)));
+  return UnboxFixnum(Car(rope_string));
 }
 
 void AppendCharacterToRopeString(Object rope_string, u8 character) {
   s64 length = RopeStringLength(rope_string);
-  Object string = Cdr(UnboxReference(rope_string));
+  Object string = Cdr(rope_string);
 
   u8 *str = StringPointer(string);
   str[length-1] = character;
@@ -84,9 +84,9 @@ void AppendCharacterToRopeString(Object rope_string, u8 character) {
 }
 
 Object LastCdr(Object list) {
-  for (Object rest = Cdr(UnboxReference(list));
+  for (Object rest = Cdr(list);
       rest != nil;
-      list = rest, rest = Cdr(UnboxReference(rest)))
+      list = rest, rest = Cdr(rest))
     ;
 
   return list;

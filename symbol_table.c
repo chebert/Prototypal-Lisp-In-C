@@ -10,11 +10,6 @@
 #include "symbol.h"
 #include "vector.h"
 
-// Returns the first object in a list
-Object First(Object pair);
-// Returns the rest of a list given a pair.
-Object Rest(Object pair);
-
 // Returns true if the string object is deep equal to c_string.
 b64 IsSymbolEqual(Object symbol, const char *name);
 
@@ -106,7 +101,7 @@ Object RemoveSymbolDestructively(Object symbols, const char *name) {
       if (IsSymbolEqual(symbol, name)) {
         // prev := (x . symbol . rest)
         // symbols := (symbol . rest)
-        SetCdr(UnboxReference(prev), Rest(symbols));
+        SetCdr(prev, Rest(symbols));
         // prev := (x . rest)
         return result;
       }
@@ -134,15 +129,6 @@ b64 IsSymbolEqual(Object symbol, const char *name) {
   char *symbol_string = (char*)&memory.the_objects[symbol_reference + 1];
 
   return strcmp(symbol_string, name) == 0;
-}
-
-Object First(Object pair) {
-  assert(IsPair(pair));
-  return Car(UnboxReference(pair));
-}
-Object Rest(Object pair) {
-  assert(IsPair(pair));
-  return Cdr(UnboxReference(pair));
 }
 
 // DJB2 algorithm by Dan Bernstein

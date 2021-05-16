@@ -1,4 +1,6 @@
 #include "pair.h"
+
+#include <assert.h>
 #include <stdio.h>
 
 #include "memory.h"
@@ -42,26 +44,34 @@ Object MovePair(u64 ref) {
   return the_pair;
 }
 
-Object Car(u64 reference) {
-  return memory.the_objects[reference];
+Object Car(Object pair) {
+  assert(IsPair(pair));
+  return memory.the_objects[UnboxReference(pair)];
 }
-Object Cdr(u64 reference) {
-  return memory.the_objects[reference + 1];
+Object Cdr(Object pair) {
+  assert(IsPair(pair));
+  return memory.the_objects[UnboxReference(pair) + 1];
 }
-void SetCar(u64 reference, Object value) {
-  memory.the_objects[reference] = value;
+
+void SetCar(Object pair, Object value) {
+  assert(IsPair(pair));
+  memory.the_objects[UnboxReference(pair)] = value;
 }
-void SetCdr(u64 reference, Object value) {
-  memory.the_objects[reference + 1] = value;
+void SetCdr(Object pair, Object value) {
+  assert(IsPair(pair));
+  memory.the_objects[UnboxReference(pair) + 1] = value;
 }
+
+Object First(Object pair) { return Car(pair); }
+Object Rest(Object pair) { return Cdr(pair); }
 
 Object MakePair(Object car, Object cdr) {
   SavePair(car, cdr);
   Object pair = AllocatePair();
   RestorePair(&car, &cdr);
 
-  SetCar(UnboxReference(pair), car);
-  SetCdr(UnboxReference(pair), cdr);
+  SetCar(pair, car);
+  SetCdr(pair, cdr);
 
   return pair;
 }
