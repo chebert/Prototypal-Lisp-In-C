@@ -1,4 +1,4 @@
-#include "rope.h"
+#include "read_buffer.h"
 
 #include <assert.h>
 #include <string.h>
@@ -168,7 +168,7 @@ u64 RopeLengthInBytes(Object rope) {
   return num_characters + 1; // \0-terminator
 }
 
-void TestRope() {
+void TestReadBuffer() {
   // Test appending values and garbage collecting in the midst of moving values.
   InitializeMemory(28);
   MakePair(BoxFixnum(1), BoxFixnum(2));

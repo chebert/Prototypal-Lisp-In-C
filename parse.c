@@ -6,7 +6,7 @@
 #include "tag.h"
 #include "memory.h"
 #include "symbol_table.h"
-#include "rope.h"
+#include "read_buffer.h"
 
 
 // Object := floating-point
@@ -201,6 +201,6 @@ int main(int argc, char** argv) {
   TestTag();
   TestMemory();
   TestSymbolTable();
-  TestRope();
+  TestReadBuffer();
   //TestParse();
 }

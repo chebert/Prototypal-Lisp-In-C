@@ -1,5 +1,5 @@
-#ifndef ROPE_H
-#define ROPE_H
+#ifndef READ_BUFFER_H
+#define READ_BUFFER_H
 
 #include "tag.h"
 
@@ -15,6 +15,6 @@ void AppendReadBuffer(u8 character);
 // Return a single string with all of the characters in the read buffer copied into it.
 Object FinalizeReadBuffer();
 
-void TestRope();
+void TestReadBuffer();
 
 #endif
