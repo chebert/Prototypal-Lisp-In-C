@@ -51,6 +51,8 @@ u64 RopeLengthInBytes(Object rope);
 void AppendNewStrand(Object rope);
 
 void ResetReadBuffer(s64 buffer_size) {
+  // TODO: if read buffer already exists, discard all but one strand
+  // after refactoring
   SetRegister(REGISTER_READ_BUFFER, MakeRope(buffer_size));
 }
 
@@ -95,6 +97,10 @@ Object FinalizeReadBuffer() {
   // Null terminate the string
   ByteVectorSet(characters, num_bytes-1, 0);
   return BoxString(characters);
+}
+
+u64 ReadBufferLength() {
+  return RopeLengthInBytes(GetRegister(REGISTER_READ_BUFFER)) - 1;
 }
 
 // strand := (num_bytes . string)
@@ -170,7 +176,7 @@ u64 RopeLengthInBytes(Object rope) {
 
 void TestReadBuffer() {
   // Test appending values and garbage collecting in the midst of moving values.
-  InitializeMemory(28);
+  InitializeMemory(29);
   MakePair(BoxFixnum(1), BoxFixnum(2));
   MakePair(BoxFixnum(1), BoxFixnum(2));
   MakePair(BoxFixnum(1), BoxFixnum(2));

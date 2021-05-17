@@ -17,4 +17,7 @@ Object FinalizeReadBuffer();
 
 void TestReadBuffer();
 
+// Return the length of the read buffer in characters.
+u64 ReadBufferLength();
+
 #endif
