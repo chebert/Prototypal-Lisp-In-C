@@ -44,7 +44,7 @@ void CollectGarbage() {
   // Scan over the freshly moved objects
   //  if a reference to an old object is encountered, move it
   // when scan catches up to free, the entire memory has been scanned/moved.
-  for (u64 scan = 0; scan < memory.free; ++scan) {
+  for (u64 scan = 0; scan < memory.free;) {
     printf("CollectGarbage: Scanning object at %llu. Free=%llu\n", scan, memory.free);
     Object object = memory.new_objects[scan];
 
@@ -55,6 +55,7 @@ void CollectGarbage() {
       printf("CollectGarbage: Encountered blob of size %llu objects. Scan=%llu\n", num_objects, scan);
     } else {
       memory.new_objects[scan] = MoveObject(object);
+      ++scan;
     }
   }
   memory.num_objects_moved += memory.free;
@@ -71,7 +72,9 @@ Object MoveObject(Object object) {
   PrintReference(object);
   printf("\n");
   // If it isn't tagged, it's a double float.
-  if (!IsTagged(object)) { return MovePrimitive(object); }
+  if (!IsTagged(object)) {
+    return MovePrimitive(object);
+  }
   switch (GetTag(object)) {
     case TAG_NIL:
     case TAG_TRUE:

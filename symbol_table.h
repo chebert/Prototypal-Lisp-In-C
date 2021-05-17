@@ -17,6 +17,7 @@ Object MakeSymbolTable(u64 size);
 Object FindSymbol(Object name);
 Object InternSymbol(Object name);
 void UninternSymbol(Object name);
+
 void TestSymbolTable();
 
 #endif

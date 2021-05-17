@@ -5,7 +5,9 @@
 #include <string.h>
 
 #include "memory.h"
+#include "pair.h"
 #include "read_buffer.h"
+#include "root.h"
 #include "string.h"
 #include "symbol_table.h"
 #include "tag.h"
@@ -127,6 +129,7 @@ Object ReadString(struct Stream *stream, struct ParseState *state);
 Object ReadHash(struct Stream *stream, struct ParseState *state);
 Object ReadSignedNumberOrSymbol(struct Stream *stream, struct ParseState *state);
 Object ReadNumberOrSymbol(struct Stream *stream, struct ParseState *state);
+Object ReadFloatingPointOrSymbol(struct Stream *stream, struct ParseState *state);
 Object ReadListLike(struct Stream *stream, struct ParseState *state);
 Object ReadSymbol(struct Stream *stream, struct ParseState *state);
 
@@ -187,7 +190,15 @@ Object ReadNumberOrSymbol(struct Stream *stream, struct ParseState *state) { ret
 Object ReadFloatingPointOrSymbol(struct Stream *stream, struct ParseState *state) { return nil; }
 
 Object ReadQuote(struct Stream *stream, struct ParseState *state) {
-  return ReadObject(stream, state);
+  Object object = ReadObject(stream, state);
+  SetRegister(REGISTER_READ_BUFFER, MakePair(object, nil));
+  // REFERENCES INVALIDATED
+
+  Object symbol = InternSymbol(AllocateString("quote"));
+  // REFERENCES INVALIDATED
+
+  Object quoted_object = MakePair(symbol, GetRegister(REGISTER_READ_BUFFER));
+  return quoted_object;
 }
 Object ReadListLike(struct Stream *stream, struct ParseState *state) { return nil; }
 
@@ -255,6 +266,11 @@ void TestParse() {
   PrintlnObject(object);
 
   stream = MakeStringStream("  #t ");
+  state = MakeParseState();
+  object = ReadObject(&stream, &state);
+  PrintlnObject(object);
+
+  stream = MakeStringStream(" 'symbol ");
   state = MakeParseState();
   object = ReadObject(&stream, &state);
   PrintlnObject(object);
