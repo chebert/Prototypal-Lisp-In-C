@@ -221,9 +221,9 @@ Object ReadNumberOrSymbol(struct ParseState *state) {
 }
 
 Object ReadFloatingPointOrSymbol(struct ParseState *state) {
-  AppendReadBuffer(state->last_char);
-
   if (IsDecimalPoint(state->last_char)) {
+    AppendReadBuffer(state->last_char);
+
     // Read 0 or more digits
     // followed by an optional exponent.
     while (1) {
@@ -248,7 +248,6 @@ Object ReadFloatingPointOrSymbol(struct ParseState *state) {
           // read buffer: .e
           return ReadSymbol(state);
         } else {
-          AppendReadBuffer(next);
           return ReadExponentOrSymbol(state);
         }
       } else {
@@ -271,6 +270,9 @@ Object ReadExponentOrSymbol(struct ParseState *state) {
   // exponent := exponent-marker [sign] {digit+}
   // read buffer: {decimal} {exponent-marker}
 
+  int exponent_marker = state->last_char;
+  AppendReadBuffer('e');
+
   int next = ReadChar(state);
   AppendReadBuffer(next);
   if (IsNumberSign(next)) {
@@ -290,10 +292,15 @@ Object ReadExponentOrSymbol(struct ParseState *state) {
           AppendReadBuffer(next);
         } else if (IsWhitespace(next) || IsEof(next)) {
           // read buffer: {decimal} {exponent-marker} {sign} {digit}+
-          // TODO: Handle real32
-          real64 value;
-          assert(!IsEof(sscanf(StringCharacterBuffer(FinalizeReadBuffer()), "%lf", &value)));
-          return BoxReal64(value);
+          if (exponent_marker == 's' || exponent_marker == 'S') {
+            real32 value;
+            assert(!IsEof(sscanf(StringCharacterBuffer(FinalizeReadBuffer()), "%f", &value)));
+            return BoxReal32(value);
+          } else {
+            real64 value;
+            assert(!IsEof(sscanf(StringCharacterBuffer(FinalizeReadBuffer()), "%lf", &value)));
+            return BoxReal64(value);
+          }
         } else {
           // read buffer: {decimal} e {exponent-marker} {sign} {digit}+ {other}
           return ReadSymbol(state);
@@ -319,10 +326,16 @@ Object ReadExponentOrSymbol(struct ParseState *state) {
         AppendReadBuffer(next);
       } else if (IsWhitespace(next) || IsEof(next)) {
         // read buffer: {decimal} e {exponent-marker} {digit}+
-        // TODO handle Real32
-        real64 value;
-        assert(!IsEof(sscanf(StringCharacterBuffer(FinalizeReadBuffer()), "%lf", &value)));
-        return BoxReal64(value);
+        // TODO consolidate
+        if (exponent_marker == 's' || exponent_marker == 'S') {
+          real32 value;
+          assert(!IsEof(sscanf(StringCharacterBuffer(FinalizeReadBuffer()), "%f", &value)));
+          return BoxReal32(value);
+        } else {
+          real64 value;
+          assert(!IsEof(sscanf(StringCharacterBuffer(FinalizeReadBuffer()), "%lf", &value)));
+          return BoxReal64(value);
+        }
       } else {
         // read buffer: {decimal} e {exponent-marker} {digit}+ {other}
         return ReadSymbol(state);
@@ -510,6 +523,16 @@ void TestParse() {
   object = ReadObject(&state);
   assert(IsReal64(object));
   assert(UnboxReal64(object) == 1000.0);
+
+  state = MakeParseState(MakeStringStream(" 1.0d3 "));
+  object = ReadObject(&state);
+  assert(IsReal64(object));
+  assert(UnboxReal64(object) == 1000.0);
+
+  state = MakeParseState(MakeStringStream(" 1.0s3 "));
+  object = ReadObject(&state);
+  assert(IsReal32(object));
+  assert(UnboxReal32(object) == 1000.0f);
 }
 
 int main(int argc, char** argv) {
