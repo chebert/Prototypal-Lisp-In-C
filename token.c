@@ -175,7 +175,11 @@ struct Token SingleCharacterToken(enum TokenType type, const u8 *source) {
 }
 
 b64 IsWhitespace(u8 ch) { return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\v' || ch == '\f'; }
-b64 IsCloseDelimiter(u8 ch) { return IsWhitespace(ch) || ch == ')' || ch == '\0' || ch == ';'; }
+// Symbols cannot contain "()'; whitespace, or eof
+// Symbols CAN contain .
+b64 IsCloseDelimiter(u8 ch) {
+  return IsWhitespace(ch) || ch == '(' || ch == ')' || ch == '\0' || ch == '\'' || ch == '"' || ch == ';';
+}
 
 const u8 *DiscardInitialWhitespace(const u8 *source) {
   for (; IsWhitespace(*source); source = DiscardChar(source));
@@ -332,6 +336,7 @@ void TestToken() {
       token.type != TOKEN_EOF && token.type != TOKEN_UNTERIMINATED_STRING;
       source = NextToken(source, &token)) {
     PrintToken(&token);
+    printf("Remaining source: \"%s\"\n", source);
   }
   PrintToken(&token);
 
@@ -340,6 +345,7 @@ void TestToken() {
       token.type != TOKEN_EOF && token.type != TOKEN_UNTERIMINATED_STRING;
       source = NextToken(source, &token)) {
     PrintToken(&token);
+    printf("Remaining source: \"%s\"\n", source);
   }
   PrintToken(&token);
 
@@ -348,6 +354,7 @@ void TestToken() {
       token.type != TOKEN_EOF && token.type != TOKEN_UNTERIMINATED_STRING;
       source = NextToken(source, &token)) {
     PrintToken(&token);
+    printf("Remaining source: \"%s\"\n", source);
   }
   PrintToken(&token);
 }
