@@ -79,6 +79,67 @@ struct ParseState {
   struct Stream stream;
 };
 
+int GetChar(struct Stream *stream);
+struct Stream MakeStringStream(const char *string);
+
+b64 IsNumberSign(int ch);
+b64 IsDigit(int ch);
+b64 IsDecimalPoint(int ch);
+b64 IsExponentMarker(int ch);
+
+b64 IsSymbolicQuote(int ch);
+b64 IsStringQuote(int ch);
+
+b64 IsHash(int ch);
+
+b64 IsOpenList(int ch);
+b64 IsCloseList(int ch);
+
+b64 IsWhitespace(int ch);
+b64 IsEof(int ch);
+b64 IsEscape(int ch);
+
+b64 IsEndDelimiter(int ch);
+
+struct ParseState MakeParseState(struct Stream stream);
+int ReadChar(struct ParseState* state);
+int PeekChar(struct ParseState* state);
+void PrintParseState(struct ParseState *state);
+
+int ReadCharIgnoringWhitespace(struct ParseState *state);
+Object ReadObject(struct ParseState *state);
+Object ReadQuote(struct ParseState *state);
+Object ReadString(struct ParseState *state);
+Object ReadHash(struct ParseState *state);
+Object ReadSignedNumberOrSymbol(struct ParseState *state);
+Object ReadNumberOrSymbol(struct ParseState *state);
+Object ReadFloatingPointOrSymbol(struct ParseState *state);
+Object ReadExponentOrSymbol(struct ParseState *state);
+Object ReadSymbol(struct ParseState *state);
+Object ReadListLike(struct ParseState *state);
+
+// Returns the next character.
+int HandleEscape(struct ParseState *state, int next);
+
+struct Stream MakeStringStream(const char *string) {
+  struct Stream stream;
+  stream.type = STREAM_TYPE_STRING;
+  stream.as.string_stream.position = 0;
+  stream.as.string_stream.string = string;
+  return stream;
+}
+
+struct ParseState MakeParseState(struct Stream stream) {
+  struct ParseState state;
+  state.last_char = 0;
+  state.eof = 0;
+  state.chars = 0;
+  state.lines = 0;
+  state.sub_forms = 0;
+  state.stream = stream;
+  return state;
+}
+
 int GetChar(struct Stream *stream) {
   if (stream->type == STREAM_TYPE_FILE) {
     return fgetc(stream->as.file);
@@ -93,12 +154,15 @@ int GetChar(struct Stream *stream) {
   }
 }
 
-struct Stream MakeStringStream(const char *string) {
-  struct Stream stream;
-  stream.type = STREAM_TYPE_STRING;
-  stream.as.string_stream.position = 0;
-  stream.as.string_stream.string = string;
-  return stream;
+int ReadChar(struct ParseState* state) {
+  int next = GetChar(&state->stream);
+  state->last_char = next;
+  ++state->chars;
+  if (next == EOF)
+    state->eof = 1;
+  if (next == '\n')
+    ++state->lines;
+  return next;
 }
 
 b64 IsNumberSign(int ch) { return ch == '+' || ch == '-'; }
@@ -118,71 +182,43 @@ b64 IsWhitespace(int ch) { return ch == ' ' || ch == '\t' || ch == '\n' || ch ==
 b64 IsEof(int ch) { return ch == EOF; }
 b64 IsEscape(int ch) { return ch == '\\'; }
 
-struct ParseState MakeParseState(struct Stream stream);
-int ReadChar(struct ParseState* state);
-int PeekChar(struct ParseState* state);
-void PrintParseState(struct ParseState *state);
+b64 IsEndDelimiter(int ch) { return IsWhitespace(ch) || IsCloseList(ch) || IsEof(ch); }
 
-int ReadCharIgnoringWhitespace(struct ParseState *state);
-Object ReadObject(struct ParseState *state);
-Object ReadQuote(struct ParseState *state);
-Object ReadString(struct ParseState *state);
-Object ReadHash(struct ParseState *state);
-Object ReadSignedNumberOrSymbol(struct ParseState *state);
-Object ReadNumberOrSymbol(struct ParseState *state);
-Object ReadFloatingPointOrSymbol(struct ParseState *state);
-Object ReadExponentOrSymbol(struct ParseState *state);
-Object ReadListLike(struct ParseState *state);
-Object ReadSymbol(struct ParseState *state);
-
-// Returns the next character.
-int HandleEscape(struct ParseState *state, int next);
-
-struct ParseState MakeParseState(struct Stream stream) {
-  struct ParseState state;
-  state.last_char = 0;
-  state.eof = 0;
-  state.chars = 0;
-  state.lines = 0;
-  state.sub_forms = 0;
-  state.stream = stream;
-  return state;
-}
-
-int ReadChar(struct ParseState* state) {
-  int next = GetChar(&state->stream);
-  state->last_char = next;
-  ++state->chars;
-  if (next == EOF)
-    state->eof = 1;
-  if (next == '\n')
-    ++state->lines;
-  return next;
-}
-
+Object ReadObjectGivenFirstChar(struct ParseState *state, int first_char);
 Object ReadObject(struct ParseState *state) {
   ResetReadBuffer(256);
   int next = ReadCharIgnoringWhitespace(state);
-  if (IsEof(next)) {
-    return nil;
-  } else if (IsSymbolicQuote(next)) {
-    return ReadQuote(state);
-  } else if (IsStringQuote(next)) {
-    return ReadString(state);
-  } else if (IsHash(next)) {
-    return ReadHash(state);
-  } else if (IsNumberSign(next)) {
-    return ReadSignedNumberOrSymbol(state);
-  } else if (IsDigit(next)) {
-    return ReadNumberOrSymbol(state);
-  } else if (IsDecimalPoint(next)) {
-    return ReadFloatingPointOrSymbol(state);
-  } else if (IsOpenList(next)) {
-    return ReadListLike(state);
+  ReadObjectGivenFirstChar(state, next);
+}
+
+Object ReadObjectGivenFirstChar(struct ParseState *state, int first_char) {
+  Object object = nil;
+  if (IsEof(first_char)) {
+    assert(!"ReadObject: encountered EOF before reading an object");
+  } else if (IsSymbolicQuote(first_char)) {
+    object = ReadQuote(state);
+  } else if (IsStringQuote(first_char)) {
+    object = ReadString(state);
+  } else if (IsHash(first_char)) {
+    object = ReadHash(state);
+  } else if (IsNumberSign(first_char)) {
+    object = ReadSignedNumberOrSymbol(state);
+  } else if (IsDigit(first_char)) {
+    object = ReadNumberOrSymbol(state);
+  } else if (IsDecimalPoint(first_char)) {
+    object = ReadFloatingPointOrSymbol(state);
+  } else if (IsOpenList(first_char)) {
+    object = ReadListLike(state);
+  } else if (IsCloseList(first_char)) {
+    assert(!"Error: Unmatched closing list");
   } else {
-    return ReadSymbol(state);
+    object = ReadSymbol(state);
+  }
+  if (IsCloseList(state->last_char)) {
+    assert(!"Error: Unmatched closing list");
   }
   ++state->sub_forms;
+  return object;
 }
 
 int ReadCharIgnoringWhitespace(struct ParseState *state) {
@@ -205,7 +241,7 @@ Object ReadNumberOrSymbol(struct ParseState *state) {
   AppendReadBuffer(state->last_char);
   while (1) {
     int next = ReadChar(state);
-    if (IsWhitespace(next) || IsEof(next)) {
+    if (IsEndDelimiter(next)) {
       Object string = FinalizeReadBuffer();
       s64 value = 0;
       assert(!IsEof(sscanf(StringCharacterBuffer(string), "%lld", &value)));
@@ -228,7 +264,7 @@ Object ReadFloatingPointOrSymbol(struct ParseState *state) {
     // followed by an optional exponent.
     while (1) {
       int next = ReadChar(state);
-      if (IsWhitespace(next) || IsEof(next)) {
+      if (IsEndDelimiter(next)) {
         if (ReadBufferLength() == 1) {
           // read buffer: .
           return InternSymbol(FinalizeReadBuffer());
@@ -290,7 +326,7 @@ Object ReadExponentOrSymbol(struct ParseState *state) {
         if (IsDigit(next)) {
           // read buffer: {decimal} {exponent-marker} {sign} {digit}+
           AppendReadBuffer(next);
-        } else if (IsWhitespace(next) || IsEof(next)) {
+        } else if (IsEndDelimiter(next)) {
           // read buffer: {decimal} {exponent-marker} {sign} {digit}+
           if (exponent_marker == 's' || exponent_marker == 'S') {
             real32 value;
@@ -306,7 +342,7 @@ Object ReadExponentOrSymbol(struct ParseState *state) {
           return ReadSymbol(state);
         }
       }
-    } else if (IsWhitespace(next) || IsEof(next)) {
+    } else if (IsEndDelimiter(next)) {
       // read buffer: {decimal} e
       printf("Invalid symbol or floating point: %s. Expected exponent after exponent marker & sign.\n",
           StringCharacterBuffer(FinalizeReadBuffer()));
@@ -324,7 +360,7 @@ Object ReadExponentOrSymbol(struct ParseState *state) {
       if (IsDigit(next)) {
         // read buffer: {decimal} e {exponent-marker} {digit}+
         AppendReadBuffer(next);
-      } else if (IsWhitespace(next) || IsEof(next)) {
+      } else if (IsEndDelimiter(next)) {
         // read buffer: {decimal} e {exponent-marker} {digit}+
         // TODO consolidate
         if (exponent_marker == 's' || exponent_marker == 'S') {
@@ -341,7 +377,7 @@ Object ReadExponentOrSymbol(struct ParseState *state) {
         return ReadSymbol(state);
       }
     }
-  } else if (IsWhitespace(next) || IsEof(next)) {
+  } else if (IsEndDelimiter(next)) {
     // read buffer: {decimal} {exponent-marker}
     printf("Invalid symbol or floating point: %s. Expected exponent after exponent marker.\n",
         StringCharacterBuffer(FinalizeReadBuffer()));
@@ -361,14 +397,44 @@ Object ReadQuote(struct ParseState *state) {
   Object quoted_object = MakePair(symbol, MakePair(GetRegister(REGISTER_READ_QUOTED_OBJECT), nil));
   return quoted_object;
 }
-Object ReadListLike(struct ParseState *state) { return nil; }
+
+Object ReadListLike(struct ParseState *state) { 
+  int next = ReadCharIgnoringWhitespace(state);
+  if (IsEof(next)) {
+    PrintParseState(state);
+    assert(!"Encountered EOF reading a list/pair");
+  } else if (IsCloseList(next)) {
+    ReadChar(state);
+    return nil;
+  } else {
+    // (x), (x . y) or (x y ...)
+    ResetReadBuffer(256);
+    Object object = ReadObjectGivenFirstChar(state, next);
+    // TODO: save object from collection
+    next = ReadCharIgnoringWhitespace(state);
+    if (IsCloseList(next)) {
+      assert(!"list with one object");
+    } else if (IsEof(next)) {
+      PrintParseState(state);
+      assert(!"Encountered eof while reading list");
+    } else {
+      ResetReadBuffer(256);
+      Object object2 = ReadObjectGivenFirstChar(state, next);
+      if (IsSymbol(object2) && !strcmp(StringCharacterBuffer(object2), ".")) {
+        assert(!"pair");
+      } else {
+        assert(!"list with multiple objects");
+      }
+    }
+  }
+}
 
 int HandleEscape(struct ParseState *state, int next) {
   if (IsEscape(next)) {
     next = ReadChar(state);
     if (IsEof(next)) {
       PrintParseState(state);
-      assert(!"Error escaping EOF");
+      assert(!"Error cannot escape an EOF");
     }
   }
   return next;
@@ -385,7 +451,7 @@ Object ReadString(struct ParseState *state) {
 
 Object ReadSymbol(struct ParseState *state) {
   for (int next = state->last_char;
-      !(IsCloseList(next) || IsWhitespace(next) || IsEof(next));
+      !(IsEndDelimiter(next));
       next = ReadChar(state)) {
     AppendReadBuffer(HandleEscape(state, next));
   }
@@ -414,7 +480,7 @@ void PrintParseState(struct ParseState *state) {
 void TestParse() {
   InitializeMemory(128);
   InitializeSymbolTable(13);
-  // symbol
+
   struct ParseState state = MakeParseState(MakeStringStream("   symbol  "));
   Object object = ReadObject(&state);
   assert(IsSymbol(object));
@@ -533,6 +599,16 @@ void TestParse() {
   object = ReadObject(&state);
   assert(IsReal32(object));
   assert(UnboxReal32(object) == 1000.0f);
+
+  state = MakeParseState(MakeStringStream(" () "));
+  object = ReadObject(&state);
+  assert(IsNil(object));
+
+  state = MakeParseState(MakeStringStream(" (  a . b  ) "));
+  object = ReadObject(&state);
+  assert(IsPair(object));
+  assert(IsSymbol(Car(object)));
+  assert(IsSymbol(Cdr(object)));
 }
 
 int main(int argc, char** argv) {
@@ -543,5 +619,4 @@ int main(int argc, char** argv) {
   TestParse();
 }
 
-// TODO: handle closing paren when reading symbols, numbers, etc.
 // TODO: establish calling convention for ReadBlah

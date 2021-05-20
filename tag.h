@@ -1,6 +1,7 @@
 #ifndef TAG_H
 #define TAG_H
-#include <stdint.h>
+
+#include "c_types.h"
 
 // A tagged Object is a 64-bit structure with a tag and a payload.
 // In this case, a technique called NAN-boxing is used. This means that
@@ -12,15 +13,6 @@
 // To Unbox a value, we convert from a tagged Object to a C-type.
 //
 // The supported tags are listed in the Tag enumeration.
-
-// Simpler type names
-typedef int64_t  s64;
-typedef uint64_t u64;
-typedef uint32_t u32;
-typedef uint8_t  u8;
-typedef s64      b64;
-typedef float    real32;
-typedef double   real64;
 
 // Objects are u64 so that we can easily perform bit manipulations.
 typedef u64      Object;
