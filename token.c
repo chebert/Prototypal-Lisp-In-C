@@ -14,7 +14,6 @@ enum TokenType {
   TOKEN_SYMBOLIC_QUOTE,
 
   TOKEN_STRING,
-  TOKEN_DISPATCH,
   TOKEN_INTEGER,
   TOKEN_REAL32,
   TOKEN_REAL64,
@@ -62,30 +61,23 @@ const u8 *DiscardChar(const u8 *source);
 const u8 *NextToken(const u8 *source, struct Token *result) {
   source = DiscardInitialWhitespace(source);
   u8 next = *source;
-  switch (next) {
-    // Single character tokens
-    case  '(': *result = SingleCharacterToken(TOKEN_LIST_OPEN,      source++);   break;
-    case  ')': *result = SingleCharacterToken(TOKEN_LIST_CLOSE,     source++);   break;
-    case '\'': *result = SingleCharacterToken(TOKEN_SYMBOLIC_QUOTE, source++);   break;
-    case  '#': *result = SingleCharacterToken(TOKEN_DISPATCH,       source++);   break;
-    case '\0': *result = SingleCharacterToken(TOKEN_EOF,            source);     break;
-    // Multi-character tokens
-    case  '"':  source =                        NextStringToken(source, result); break;
-    case  ';':  source =                   NextLineCommentToken(source, result); break;
-    default  :  source = NextNumberOrSymbolOrPairSeparatorToken(source, result); break;
-  }
-  return source;
-}
+  // Single character tokens
+  if      (next ==  '(')
+    *result = SingleCharacterToken(TOKEN_LIST_OPEN,      source++);
+  else if (next ==  ')')
+    *result = SingleCharacterToken(TOKEN_LIST_CLOSE,     source++);
+  else if (next == '\'')
+    *result = SingleCharacterToken(TOKEN_SYMBOLIC_QUOTE, source++);
+  else if (next == '\0')
+    *result = SingleCharacterToken(TOKEN_EOF,            source);
+  else if (next ==  '.' && IsCloseDelimiter(*DiscardChar(source)))
+    *result = SingleCharacterToken(TOKEN_PAIR_SEPARATOR, source++);
 
-const u8 *NextNumberOrSymbolOrPairSeparatorToken(const u8 *source, struct Token *result) {
-  if (*source == '.' && IsCloseDelimiter(*DiscardChar(source))) {
-    // Case: Complete token is "."
-    // Tested first so it doesn't match as a symbol.
-    *result = SingleCharacterToken(TOKEN_PAIR_SEPARATOR, source);
-    return DiscardChar(source);
-  } else {
-    return NextNumberOrSymbolToken(source, result);
-  }
+  // Multi-character tokens
+  else if (next ==  '"') source =        NextStringToken(source, result);
+  else if (next ==  ';') source =    NextLineCommentToken(source, result);
+  else                   source = NextNumberOrSymbolToken(source, result);
+  return source;
 }
 
 const u8 *HandleEscape(const u8 *source, struct Token *result) {
@@ -95,28 +87,31 @@ const u8 *HandleEscape(const u8 *source, struct Token *result) {
   return source;
 }
 
+enum TokenType NumberOrSymbolTokenType(const u8 *source, u64 length) {
+  u8 exponent_marker = 'e';
+  if (IsInteger(source, length)) {
+    return TOKEN_INTEGER;
+  } else if (IsReal(source, length, &exponent_marker)) {
+    if (IsReal32ExponentMarker(exponent_marker)) {
+      return TOKEN_REAL32;
+    } else {
+      return TOKEN_REAL64;
+    }
+  } else {
+    return TOKEN_SYMBOL;
+  }
+}
+
 const u8 *NextNumberOrSymbolToken(const u8 *source, struct Token *result) {
   // Read the full token
   result->source = source;
   result->length = 0;
+  // Token is complete when we encounter a close delimiter
   for (; !IsCloseDelimiter(*source); source = ExtendToken(source, result))
     ;
 
-  // Determine token type
-  // default to real64
-  u8 exponent_marker = 'e';
-  if (IsInteger(result->source, result->length)) {
-    result->type = TOKEN_INTEGER;
-  } else if (IsReal(result->source, result->length, &exponent_marker)) {
-    if (IsReal32ExponentMarker(exponent_marker)) {
-      result->type = TOKEN_REAL32;
-    } else {
-      result->type = TOKEN_REAL64;
-    }
-  } else {
-    result->type = TOKEN_SYMBOL;
-  }
-
+  // Determine if integer, real32, real64, or symbol
+  result->type = NumberOrSymbolTokenType(result->source, result->length);
   return source;
 }
 
@@ -161,7 +156,6 @@ const u8 *TokenTypeString(enum TokenType type) {
     case TOKEN_PAIR_SEPARATOR: return "PAIR_SEPARATOR";
     case TOKEN_SYMBOLIC_QUOTE: return "SYMBOLIC_QUOTE";
     case TOKEN_STRING: return "STRING";
-    case TOKEN_DISPATCH: return "DISPATCH";
     case TOKEN_INTEGER: return "INTEGER";
     case TOKEN_REAL32: return "REAL32";
     case TOKEN_REAL64: return "REAL64";
