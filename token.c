@@ -135,7 +135,7 @@ const u8 *NextStringToken(const u8 *source, struct Token *result) {
   for (; *source != '"'; source = ExtendToken(source, result)) {
     source = HandleEscape(source, result);
     if (*source == 0) {
-      result->type = TOKEN_UNTERIMINATED_STRING;
+      result->type = TOKEN_UNTERMINATED_STRING;
       return source;
     }
   }
@@ -177,7 +177,7 @@ const u8 *TokenTypeString(enum TokenType type) {
     case TOKEN_SYMBOL: return "SYMBOL";
     case TOKEN_LINE_COMMENT: return "LINE_COMMENT";
     case TOKEN_EOF: return "EOF";
-    case TOKEN_UNTERIMINATED_STRING: return "UNTERMINATED_STRING";
+    case TOKEN_UNTERMINATED_STRING: return "UNTERMINATED_STRING";
   }
 }
 
@@ -353,41 +353,66 @@ void TestToken() {
 #undef S
 
   const u8 *source = "(the (quick 'brown) fox \"jumped ;)(\\\" over the \" ;; I'm a line comment\n lazy) 123 1.234 1s0 dog (car . cdr) last #t #f";
+  enum TokenType expected_types[] = {
+    TOKEN_LIST_OPEN,
+    TOKEN_SYMBOL,
+    TOKEN_LIST_OPEN,
+    TOKEN_SYMBOL,
+    TOKEN_SYMBOLIC_QUOTE,
+    TOKEN_SYMBOL,
+    TOKEN_LIST_CLOSE,
+    TOKEN_SYMBOL,
+    TOKEN_STRING,
+    TOKEN_LINE_COMMENT,
+    TOKEN_SYMBOL,
+    TOKEN_LIST_CLOSE,
+    TOKEN_INTEGER,
+    TOKEN_REAL64,
+    TOKEN_REAL32,
+    TOKEN_SYMBOL,
+    TOKEN_LIST_OPEN,
+    TOKEN_SYMBOL,
+    TOKEN_PAIR_SEPARATOR,
+    TOKEN_SYMBOL,
+    TOKEN_LIST_CLOSE,
+    TOKEN_SYMBOL,
+    TOKEN_SYMBOL,
+    TOKEN_SYMBOL,
+    TOKEN_EOF,
+  };
+
   struct Token token;
+  int i = 0;
   for (source = NextToken(source, &token);
-      token.type != TOKEN_EOF && token.type != TOKEN_UNTERIMINATED_STRING;
-      source = NextToken(source, &token)) {
-    PrintToken(&token);
-    printf("Remaining source: \"%s\"\n", source);
+      token.type != TOKEN_EOF && token.type != TOKEN_UNTERMINATED_STRING;
+      source = NextToken(source, &token), ++i) {
+    assert(token.type == expected_types[i]);
   }
-  PrintToken(&token);
+  assert(token.type == expected_types[i]);
 
   source = "\" I'm an unterminated string";
-  for (source = NextToken(source, &token);
-      token.type != TOKEN_EOF && token.type != TOKEN_UNTERIMINATED_STRING;
-      source = NextToken(source, &token)) {
-    PrintToken(&token);
-    printf("Remaining source: \"%s\"\n", source);
-  }
-  PrintToken(&token);
+  NextToken(source, &token);
+  assert(token.type == TOKEN_UNTERMINATED_STRING);
 
-  source = ";; I'm an unterminated comment";
-  for (source = NextToken(source, &token);
-      token.type != TOKEN_EOF && token.type != TOKEN_UNTERIMINATED_STRING;
-      source = NextToken(source, &token)) {
-    PrintToken(&token);
-    printf("Remaining source: \"%s\"\n", source);
-  }
-  PrintToken(&token);
+  source = ";; I'm a line comment";
+  source = NextToken(source, &token);
+  assert(token.type == TOKEN_LINE_COMMENT);
+  NextToken(source, &token);
+  assert(token.type == TOKEN_EOF);
 
-  source = "symbol\\)-with\\ escaped symbol)split\"bythings\"";
-  for (source = NextToken(source, &token);
-      token.type != TOKEN_EOF && token.type != TOKEN_UNTERIMINATED_STRING;
-      source = NextToken(source, &token)) {
-    PrintToken(&token);
-    printf("Remaining source: \"%s\"\n", source);
-  }
-  PrintToken(&token);
+  source = "symbol\\)-with\\ escaped";
+  source = NextToken(source, &token);
+  assert(token.type == TOKEN_SYMBOL);
+  NextToken(source, &token);
+  assert(token.type == TOKEN_EOF);
+
+  source = "symbol\"string\"";
+  source = NextToken(source, &token);
+  assert(token.type == TOKEN_SYMBOL);
+  source = NextToken(source, &token);
+  assert(token.type == TOKEN_STRING);
+  NextToken(source, &token);
+  assert(token.type == TOKEN_EOF);
 }
 
 int main(int argc, char **argv) {

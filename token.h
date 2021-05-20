@@ -32,13 +32,14 @@ enum TokenType {
   // Token representing end-of-file
   TOKEN_EOF,
   // Error token created when an EOF is encountered before a string is terminated.
-  TOKEN_UNTERIMINATED_STRING
+  TOKEN_UNTERMINATED_STRING
 };
 
 // Return the string representing the token type.
 const u8 *TokenTypeString(enum TokenType type);
 
 struct Token {
+  // Type of the token.
   enum TokenType type;
   // Pointer to the start of the token in the source string. Not null-terminated.
   const u8* source;
