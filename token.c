@@ -1,45 +1,11 @@
+#include "token.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "c_types.h"
-
-enum TokenType {
-  TOKEN_LIST_OPEN,
-  TOKEN_LIST_CLOSE,
-
-  TOKEN_PAIR_SEPARATOR,
-
-  TOKEN_SYMBOLIC_QUOTE,
-
-  TOKEN_STRING,
-  TOKEN_INTEGER,
-  TOKEN_REAL32,
-  TOKEN_REAL64,
-  TOKEN_SYMBOL,
-
-  TOKEN_LINE_COMMENT,
-
-  TOKEN_EOF,
-  TOKEN_UNTERIMINATED_STRING
-};
-
-struct Token {
-  enum TokenType type;
-  const u8* source;
-  u64 length;
-};
-
-// Reads from source. The next token is stored in result.
-// The unconsumed portion of source returned.
-const u8 *NextToken(const u8 *source, struct Token *result);
-
-
-// Return the string representing the token type.
-const u8 *TokenTypeString(enum TokenType type);
-// Debug print of token
-void PrintToken(struct Token* token);
 
 // Reads the next number or symbol token from source until
 const u8 *NextNumberOrSymbolToken(const u8 *source, struct Token *result);
@@ -99,7 +65,7 @@ const u8 *ExtendToken(const u8 *source, struct Token *token);
 // Returns source after discarding a character.
 const u8 *DiscardChar(const u8 *source);
 
-void TestToken();
+
 
 const u8 *NextToken(const u8 *source, struct Token *result) {
   source = DiscardInitialWhitespace(source);
@@ -185,11 +151,15 @@ const u8 *NextLineCommentToken(const u8 *source, struct Token *result) {
   return source;
 }
 
-void PrintToken(struct Token* token) {
-  u8 *source = (u8 *)malloc(token->length+1);
+u8 *CopyTokenSource(const struct Token *token) {
+  u8 *source = malloc(token->length+1);
   strncpy(source, token->source, token->length);
   source[token->length] = '\0';
+  return source;
+}
 
+void PrintToken(struct Token* token) {
+  u8 *source = CopyTokenSource(token);
   printf("Token type=%s, length=%llu, source:\"%s\"\n", TokenTypeString(token->type), token->length, source);
   free(source);
 }
