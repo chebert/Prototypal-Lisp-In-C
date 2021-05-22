@@ -91,12 +91,38 @@ const u8 *NextToken(const u8 *source, struct Token *result) {
     return NextNumberOrSymbolToken(source, result);
 }
 
-const u8 *HandleEscape(const u8 *source, struct Token *result) {
-  if (*source == '\\') {
-    return ExtendToken(source, result);
-  }
+u8 *CopyTokenSource(const struct Token *token) {
+  u8 *source = malloc(token->length+1);
+  strncpy(source, token->source, token->length);
+  source[token->length] = '\0';
   return source;
 }
+
+void PrintToken(struct Token* token) {
+  u8 *source = CopyTokenSource(token);
+  printf("Token type=%s, length=%llu, source:\"%s\"\n", TokenTypeString(token->type), token->length, source);
+  free(source);
+}
+
+const u8 *TokenTypeString(enum TokenType type) {
+  switch (type) {
+    case TOKEN_LIST_OPEN: return "LIST_OPEN";
+    case TOKEN_LIST_CLOSE: return "LIST_CLOSE";
+    case TOKEN_PAIR_SEPARATOR: return "PAIR_SEPARATOR";
+    case TOKEN_SYMBOLIC_QUOTE: return "SYMBOLIC_QUOTE";
+    case TOKEN_STRING: return "STRING";
+    case TOKEN_INTEGER: return "INTEGER";
+    case TOKEN_REAL32: return "REAL32";
+    case TOKEN_REAL64: return "REAL64";
+    case TOKEN_SYMBOL: return "SYMBOL";
+    case TOKEN_LINE_COMMENT: return "LINE_COMMENT";
+    case TOKEN_EOF: return "EOF";
+    case TOKEN_UNTERMINATED_STRING: return "UNTERMINATED_STRING";
+  }
+}
+
+
+
 
 enum TokenType NumberOrSymbolTokenType(const u8 *source, u64 length) {
   u8 exponent_marker;
@@ -151,36 +177,6 @@ const u8 *NextLineCommentToken(const u8 *source, struct Token *result) {
   return source;
 }
 
-u8 *CopyTokenSource(const struct Token *token) {
-  u8 *source = malloc(token->length+1);
-  strncpy(source, token->source, token->length);
-  source[token->length] = '\0';
-  return source;
-}
-
-void PrintToken(struct Token* token) {
-  u8 *source = CopyTokenSource(token);
-  printf("Token type=%s, length=%llu, source:\"%s\"\n", TokenTypeString(token->type), token->length, source);
-  free(source);
-}
-
-const u8 *TokenTypeString(enum TokenType type) {
-  switch (type) {
-    case TOKEN_LIST_OPEN: return "LIST_OPEN";
-    case TOKEN_LIST_CLOSE: return "LIST_CLOSE";
-    case TOKEN_PAIR_SEPARATOR: return "PAIR_SEPARATOR";
-    case TOKEN_SYMBOLIC_QUOTE: return "SYMBOLIC_QUOTE";
-    case TOKEN_STRING: return "STRING";
-    case TOKEN_INTEGER: return "INTEGER";
-    case TOKEN_REAL32: return "REAL32";
-    case TOKEN_REAL64: return "REAL64";
-    case TOKEN_SYMBOL: return "SYMBOL";
-    case TOKEN_LINE_COMMENT: return "LINE_COMMENT";
-    case TOKEN_EOF: return "EOF";
-    case TOKEN_UNTERMINATED_STRING: return "UNTERMINATED_STRING";
-  }
-}
-
 const u8 *SingleCharacterToken(enum TokenType type, const u8 *source, struct Token *result) {
   result->type = type;
   result->source = source;
@@ -192,18 +188,6 @@ const u8 *EOFToken(const u8 *source, struct Token *result) {
   result->type = TOKEN_EOF;
   result->source = source;
   result->length = 0;
-  return source;
-}
-
-b64 IsWhitespace(u8 ch) { return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\v' || ch == '\f'; }
-// Symbols end at "()'; whitespace, or eof
-// Symbols CAN contain .
-b64 IsSymbolCloseDelimiter(u8 ch) {
-  return IsWhitespace(ch) || ch == '(' || ch == ')' || ch == '\0' || ch == '\'' || ch == '"' || ch == ';';
-}
-
-const u8 *DiscardInitialWhitespace(const u8 *source) {
-  for (; IsWhitespace(*source); source = DiscardChar(source));
   return source;
 }
 
@@ -288,6 +272,13 @@ b64 IsReal(const u8 *source, u64 length, u8 *exponent_marker) {
   }
 }
 
+
+b64 IsWhitespace(u8 ch) { return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\v' || ch == '\f'; }
+// Symbols end at "()'; whitespace, or eof
+// Symbols CAN contain .
+b64 IsSymbolCloseDelimiter(u8 ch) {
+  return IsWhitespace(ch) || ch == '(' || ch == ')' || ch == '\0' || ch == '\'' || ch == '"' || ch == ';';
+}
 b64 IsDigit(u8 c) { return c >= '0' && c <= '9'; }
 b64 IsNumberSign(u8 c) { return c == '+' || c == '-'; }
 b64 IsReal32ExponentMarker(u8 marker) {
@@ -295,6 +286,19 @@ b64 IsReal32ExponentMarker(u8 marker) {
 }
 b64 IsExponentMarker(u8 marker) {
   return IsReal32ExponentMarker(marker) || marker == 'e' || marker == 'E' || marker == 'd' || marker == 'D';
+}
+
+
+const u8 *DiscardInitialWhitespace(const u8 *source) {
+  for (; IsWhitespace(*source); source = DiscardChar(source));
+  return source;
+}
+
+const u8 *HandleEscape(const u8 *source, struct Token *result) {
+  if (*source == '\\') {
+    return ExtendToken(source, result);
+  }
+  return source;
 }
 
 const u8 *ExtendToken(const u8 *source, struct Token *token) {
