@@ -61,7 +61,7 @@ Object InternSymbol(Object name) {
 
   VectorSet(GetSymbolTable(), index, new_symbols);
 
-  return FindSymbol(name);
+  return FindSymbol(BoxString(Car(new_symbols)));
 }
 
 void UninternSymbol(Object name) {
@@ -143,7 +143,9 @@ u32 HashString(const u8 *str) {
 }
 
 Object GetSymbolTable() {
-  return GetRegister(REGISTER_SYMBOL_TABLE);
+  Object table = GetRegister(REGISTER_SYMBOL_TABLE);
+  assert(table != nil);
+  return table;
 }
 
 void TestSymbolTable() {

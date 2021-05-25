@@ -418,8 +418,3 @@ void TestToken() {
   NextToken(source, &token);
   assert(token.type == TOKEN_EOF);
 }
-
-int main(int argc, char **argv) {
-  TestToken();
-  return 0;
-}
