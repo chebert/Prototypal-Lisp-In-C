@@ -1,3 +1,4 @@
+#include "read.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -10,14 +11,6 @@
 #include "string.h"
 #include "symbol_table.h"
 #include "token.h"
-
-
-const u8 *ReadObject(const u8 *source, b64 *success);
-// Tests reading objects into the buffer.
-void TestRead();
-
-
-
 
 // Returns the current memory-register read result
 Object GetReadResult();
@@ -126,7 +119,7 @@ Object ProcessSingleToken(const struct Token *token, b64 *success) {
   } else if (token->type == TOKEN_STRING) {
     object = AllocateString(data);
   } else if (token->type == TOKEN_SYMBOL) {
-    object = InternSymbol(AllocateString(data));
+    object = InternSymbol(data);
   }
   free(data);
   *success = 1;
@@ -149,7 +142,7 @@ const u8 *ReadNextObjectFromToken(const struct Token *token, const u8 *source, b
     if (!*success)
       return source;
 
-    SetReadResult(MakePair(InternSymbol(AllocateString("quote")), 
+    SetReadResult(MakePair(InternSymbol("quote"), 
           MakePair(GetReadResult(), nil)));
   } else if (token->type == TOKEN_LINE_COMMENT) {
     // discard
@@ -378,6 +371,10 @@ void TestRead() {
 }
 
 int main(int argc, char **argv) {
+  TestTag();
+  TestToken();
+  TestMemory();
+  TestSymbolTable();
   TestRead();
   return 0;
 }

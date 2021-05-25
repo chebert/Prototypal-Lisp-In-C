@@ -11,16 +11,18 @@
 #include "symbol.h"
 #include "vector.h"
 
+Object InternNewSymbol(u64 index, const u8 *name);
+
 // Returns true if the string object is deep equal the string name
-b64 IsSymbolEqual(Object symbol, Object name);
+b64 IsSymbolEqual(Object symbol, const u8 *name);
 
 // Returns the index into the symbol_table where name belongs.
-u64 GetSymbolListIndex(Object symbol_table, Object name);
+u64 GetSymbolListIndex(Object symbol_table, const u8 *name);
 // Returns the symbol or nil.
-Object FindSymbolInSymbolList(Object symbol_table, u64 index, Object name);
+Object FindSymbolInSymbolList(Object symbol_table, u64 index, const u8 *name);
 // Removes symbol with the given name from the list of symbols.
 // Returns the updated symbols list.
-Object RemoveSymbolDestructively(Object symbols, Object name);
+Object RemoveSymbolDestructively(Object symbols, const u8 *name);
 // Returns a list of list_b appended to the end of list_a
 Object Append(Object list_a, Object list_b);
 // Returns list but reversed.
@@ -39,32 +41,23 @@ Object MakeSymbolTable(u64 size) {
 }
 
 
-Object FindSymbol(Object name) {
+Object FindSymbol(const u8 *name) {
   Object symbol_table = GetSymbolTable();
   u64 index = GetSymbolListIndex(symbol_table, name);
   return FindSymbolInSymbolList(symbol_table, index, name);
 }
 
-Object InternSymbol(Object name) {
+Object InternSymbol(const u8 *name) {
   Object symbol_table = GetSymbolTable();
   u64 index = GetSymbolListIndex(symbol_table, name);
   Object found = FindSymbolInSymbolList(symbol_table, index, name);
   if (found != nil)
     return found;
 
-  // Symbol not found
-  // Create a new symbol and add it to the symbol list
-  Object new_symbol = BoxSymbol(name);
-  Object old_symbols = VectorRef(GetSymbolTable(), index);
-  Object new_symbols = MakePair(new_symbol, old_symbols);
-  // REFERENCES INVALIDATED
-
-  VectorSet(GetSymbolTable(), index, new_symbols);
-
-  return FindSymbol(BoxString(Car(new_symbols)));
+  return InternNewSymbol(index, name);
 }
 
-void UninternSymbol(Object name) {
+void UninternSymbol(const u8 *name) {
   Object symbol_table = GetSymbolTable();
   u64 index = GetSymbolListIndex(symbol_table, name);
   Object symbols = VectorRef(symbol_table, index);
@@ -76,13 +69,26 @@ void UninternSymbol(Object name) {
 
 // Helpers
 
-u64 GetSymbolListIndex(Object symbol_table, Object name) {
-  u32 hash = HashString(StringCharacterBuffer(name));
+Object InternNewSymbol(u64 index, const u8 *name) {
+  // Create a new symbol and add it to the symbol list
+  Object new_symbols =
+    MakePair(
+        BoxSymbol(AllocateString(name)),
+        VectorRef(GetSymbolTable(), index));
+
+  // Update the symbol table.
+  VectorSet(GetSymbolTable(), index, new_symbols);
+  // Return the new symbol.
+  return Car(new_symbols);
+}
+
+u64 GetSymbolListIndex(Object symbol_table, const u8 *name) {
+  u32 hash = HashString(name);
   s64 length = VectorLength(symbol_table);
   return hash % length;
 }
 
-Object RemoveSymbolDestructively(Object symbols, Object name) {
+Object RemoveSymbolDestructively(Object symbols, const u8 *name) {
   if (symbols == nil) {
     // CASE: ()
     return nil;
@@ -117,7 +123,7 @@ Object RemoveSymbolDestructively(Object symbols, Object name) {
   }
 }
 
-Object FindSymbolInSymbolList(Object symbol_table, u64 index, Object name) {
+Object FindSymbolInSymbolList(Object symbol_table, u64 index, const u8 *name) {
   for (Object symbols = VectorRef(symbol_table, index);
       symbols != nil;
       symbols = Rest(symbols)) {
@@ -128,10 +134,9 @@ Object FindSymbolInSymbolList(Object symbol_table, u64 index, Object name) {
   return nil;
 }
 
-b64 IsSymbolEqual(Object symbol, Object name) {
+b64 IsSymbolEqual(Object symbol, const u8 *name) {
   assert(IsSymbol(symbol));
-  assert(IsString(name));
-  return strcmp(StringCharacterBuffer(symbol), StringCharacterBuffer(name)) == 0;
+  return strcmp(StringCharacterBuffer(symbol), name) == 0;
 }
 
 // DJB2 algorithm by Dan Bernstein
@@ -154,7 +159,7 @@ void TestSymbolTable() {
   InitializeMemory(128);
   InitializeSymbolTable(13);
 
-  Object symbol_name = AllocateString("symbol");
+  const u8 *symbol_name = "symbol";
 
   Object symbol = FindSymbol(symbol_name);
   assert(symbol == nil);
@@ -174,13 +179,13 @@ void TestSymbolTable() {
   InitializeMemory(128);
   InitializeSymbolTable(1);
   InternSymbol(symbol_name);
-  InternSymbol(AllocateString("dimple"));
-  InternSymbol(AllocateString("pimple"));
-  InternSymbol(AllocateString("limp-pole"));
+  InternSymbol("dimple");
+  InternSymbol("pimple");
+  InternSymbol("limp-pole");
   assert(FindSymbol(symbol_name) != nil);
-  UninternSymbol(AllocateString("dimple"));
-  assert(FindSymbol(AllocateString("dimple")) == nil);
+  UninternSymbol("dimple");
+  assert(FindSymbol("dimple") == nil);
   assert(FindSymbol(symbol_name) != nil);
-  assert(FindSymbol(AllocateString("pimple")) != nil);
+  assert(FindSymbol("pimple") != nil);
   DestroyMemory();
 }

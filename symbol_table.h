@@ -14,9 +14,9 @@ void InitializeSymbolTable(u64 size);
 u32 HashString(const u8 *str);
 Object MakeSymbolTable(u64 size);
 
-Object FindSymbol(Object name);
-Object InternSymbol(Object name);
-void UninternSymbol(Object name);
+Object FindSymbol(const u8 *name);
+Object InternSymbol(const u8 *name);
+void UninternSymbol(const u8 *name);
 
 void TestSymbolTable();
 
