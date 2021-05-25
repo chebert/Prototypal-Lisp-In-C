@@ -253,6 +253,10 @@ const u8 *ContinueReadList(const u8 *source, b64 *success) {
   return source;
 }
 
+b64 SymbolEq(Object symbol, const u8 *name) {
+  return IsSymbol(symbol) && !strcmp(StringCharacterBuffer(symbol), name);
+}
+
 void TestRead() {
   InitializeMemory(128);
   InitializeSymbolTable(1);
@@ -290,7 +294,7 @@ void TestRead() {
     const u8* source = "the-symbol";
     source = ReadObject(source, &success);
     assert(success);
-    assert(IsSymbol(GetReadResult()));
+    assert(SymbolEq(GetReadResult(), "the-symbol"));
     assert(!strcmp("the-symbol", StringCharacterBuffer(GetReadResult())));
   }
 
@@ -308,8 +312,8 @@ void TestRead() {
     source = ReadObject(source, &success);
     assert(success);
     assert(IsPair(GetReadResult()));
-    assert(IsSymbol(Car(GetReadResult())));
-    assert(IsSymbol(Cdr(GetReadResult())));
+    assert(SymbolEq(Car(GetReadResult()), "a"));
+    assert(SymbolEq(Cdr(GetReadResult()), "b"));
   }
 
   // Read List
@@ -318,7 +322,7 @@ void TestRead() {
     source = ReadObject(source, &success);
     assert(success);
     assert(IsPair(GetReadResult()));
-    assert(IsSymbol(Car(GetReadResult())));
+    assert(SymbolEq(Car(GetReadResult()), "a"));
     assert(IsNil(Cdr(GetReadResult())));
   }
 
@@ -334,12 +338,12 @@ void TestRead() {
     Object v = Car(u);
     Object w = Cdr(u);
 
-    assert(IsSymbol(Car(t)));
-    assert(IsSymbol(Cdr(t)));
-    assert(IsSymbol(Car(v)));
-    assert(IsSymbol(Cdr(v)));
-    assert(IsSymbol(Car(w)));
-    assert(IsSymbol(Cdr(w)));
+    assert(SymbolEq(Car(t), "a"));
+    assert(SymbolEq(Cdr(t), "b"));
+    assert(SymbolEq(Car(v), "c"));
+    assert(SymbolEq(Cdr(v), "d"));
+    assert(SymbolEq(Car(w), "e"));
+    assert(SymbolEq(Cdr(w), "f"));
   }
 
   // Read list
@@ -358,16 +362,33 @@ void TestRead() {
     Object z = Cdr(y);
     Object S = Cdr(x);
 
-    assert(IsSymbol(Car(s))); // a
-    assert(IsSymbol(Car(t))); // b
-    assert(IsSymbol(Car(v))); // c
-    assert(IsSymbol(Car(w))); // d
-    assert(IsSymbol(Cdr(w))); // e
-    assert(IsSymbol(Car(y))); // f
-    assert(IsSymbol(Car(z))); // g
+    assert(SymbolEq(Car(s), "a"));
+    assert(SymbolEq(Car(t), "b"));
+    assert(SymbolEq(Car(v), "c"));
+    assert(SymbolEq(Car(w), "d"));
+    assert(SymbolEq(Cdr(w), "e"));
+    assert(SymbolEq(Car(y), "f"));
+    assert(SymbolEq(Car(z), "g"));
     assert(IsNil(Cdr(z)));
-    assert(IsSymbol(Car(S))); // h
+    assert(SymbolEq(Car(S), "h"));
     assert(IsNil(Cdr(S)));
+  }
+
+  // Read quoted
+  {
+    const u8* source = "'(a b)";
+    // (quote . ((a . (b . nil)) . nil))
+    //  s        tu    v
+    source = ReadObject(source, &success);
+    assert(success);
+    Object s = GetReadResult();
+    Object t = Cdr(s);
+    Object u = Car(t);
+    Object v = Cdr(u);
+
+    assert(SymbolEq(Car(s), "quote"));
+    assert(SymbolEq(Car(u), "a"));
+    assert(SymbolEq(Car(v), "b"));
   }
 
   DestroyMemory();
