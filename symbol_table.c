@@ -73,8 +73,9 @@ Object InternNewSymbol(u64 index, const u8 *name) {
   // Create a new symbol and add it to the symbol list
   Object new_symbols =
     MakePair(
-        BoxSymbol(AllocateString(name)),
+        AllocateSymbol(name),
         VectorRef(GetSymbolTable(), index));
+  // REFERENCES INVALIDATED
 
   // Update the symbol table.
   VectorSet(GetSymbolTable(), index, new_symbols);

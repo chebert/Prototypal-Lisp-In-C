@@ -118,8 +118,10 @@ Object ProcessSingleToken(const struct Token *token, b64 *success) {
     object = BoxReal64(value);
   } else if (token->type == TOKEN_STRING) {
     object = AllocateString(data);
+    // REFERENCES INVALIDATED
   } else if (token->type == TOKEN_SYMBOL) {
     object = InternSymbol(data);
+    // REFERENCES INVALIDATED
   }
   free(data);
   *success = 1;
@@ -142,8 +144,8 @@ const u8 *ReadNextObjectFromToken(const struct Token *token, const u8 *source, b
     if (!*success)
       return source;
 
-    SetReadResult(MakePair(InternSymbol("quote"), 
-          MakePair(GetReadResult(), nil)));
+    SetReadResult(MakePair(InternSymbol("quote"), MakePair(GetReadResult(), nil)));
+    // REFERENCES INVALIDATED
   } else if (token->type == TOKEN_LINE_COMMENT) {
     // discard
     source = ReadNextObject(source, success);
@@ -170,6 +172,7 @@ const u8 *ReadNextListObject(const struct Token *token, const u8 *source, b64 *s
   //     ^-here
   // stack: ((a . nil))
   PushReadStack(MakePair(GetReadResult(), nil));
+  // REFERENCES INVALIDATED
   printf("ReadNextListObject: pushing it onto the read stack: ");
   PrintlnObject(GetRegister(REGISTER_READ_STACK));
   
