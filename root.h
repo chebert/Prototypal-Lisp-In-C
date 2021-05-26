@@ -10,11 +10,13 @@ void InitializeRoot();
 
 enum Register {
   REGISTER_SYMBOL_TABLE,
-  REGISTER_THE_OBJECT,
+  // Needed for MakePair
   REGISTER_SAVED_CAR,
   REGISTER_SAVED_CDR,
-  REGISTER_READ_RESULT,
+  // Needed for reading lists
   REGISTER_READ_STACK,
+
+  REGISTER_EXPRESSION,
   NUM_REGISTERS,
 };
 

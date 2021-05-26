@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "log.h"
 #include "memory.h"
 
 Object AllocateVector(u64 num_objects) {
@@ -27,13 +28,13 @@ Object MoveVector(Object vector) {
   //      [ ..., <BH new>, ... ]
   u64 new_reference = memory.free;
 
-  printf("    MoveVector: moving from %llu in the_objects to %llu in new_objects\n", ref, new_reference);
+  LOG("moving from %llu in the_objects to %llu in new_objects\n", ref, new_reference);
   Object old_header = memory.the_objects[ref];
 
   if (IsBrokenHeart(old_header)) {
     // Already been moved
     // Old: [ ..., <BH new>, ... ]
-    printf("    MoveVector: old_header is a broken heart pointing to %llu\n", UnboxReference(old_header));
+    LOG("old_header is a broken heart pointing to %llu\n", UnboxReference(old_header));
     return BoxVector(UnboxReference(old_header));
   }
 
@@ -41,13 +42,13 @@ Object MoveVector(Object vector) {
   // Old: [ ..., nObjects, Object0, ... ObjectN, ... ]
 
   u64 num_objects = 1 + UnboxFixnum(old_header);
-  printf("    MoveVector: moving vector of size %llu objects (including header)\n", num_objects);
+  LOG("moving vector of size %llu objects (including header)\n", num_objects);
 
   memcpy(&memory.new_objects[memory.free], &memory.the_objects[ref], num_objects*sizeof(Object));
   memory.free += num_objects;
   // New: [ ..., nObjects, Object0, ... ObjectN, free.. ]
 
-  printf("    MoveVector: Leaving a broken heart pointing at %llu in its place\n", new_reference);
+  LOG("Leaving a broken heart pointing at %llu in its place\n", new_reference);
   memory.the_objects[ref] = BoxBrokenHeart(new_reference);
   // Old: [ ..., <BH new>, ... ]
 

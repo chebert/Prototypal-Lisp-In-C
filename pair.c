@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdio.h>
 
+#include "log.h"
 #include "memory.h"
 #include "root.h"
 
@@ -25,16 +26,16 @@ Object MovePair(Object pair) {
   //      [ ..., <BH new>, ... ]
   u64 new_reference = memory.free;
 
-  printf("    MovePair: moving from %llu in the_objects to %llu in new_objects\n", ref, new_reference);
+  LOG("moving from %llu in the_objects to %llu in new_objects\n", ref, new_reference);
   Object old_car = memory.the_objects[ref];
   if (IsBrokenHeart(old_car)) {
     // The pair has already been moved. Return the updated reference.
     // Old: [ ..., <BH new>, ... ]
-    printf("    MovePair: old_car is a broken heart pointing to %llu\n", UnboxReference(old_car));
+    LOG("old_car is a broken heart pointing to %llu\n", UnboxReference(old_car));
     return BoxPair(UnboxReference(old_car));
   }
 
-  printf("    MovePair: Moving from the_objects to new_objects, leaving a broken heart at %llu pointing to %llu\n", ref, new_reference);
+  LOG("Moving from the_objects to new_objects, leaving a broken heart at %llu pointing to %llu\n", ref, new_reference);
   Object moved_pair = BoxPair(new_reference);
   // Old: [ ..., car, cdr, ... ]
   memory.new_objects[memory.free++] = old_car;

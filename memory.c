@@ -7,6 +7,7 @@
 
 #include "blob.h"
 #include "byte_vector.h"
+#include "log.h"
 #include "pair.h"
 #include "root.h"
 #include "string.h"
@@ -27,32 +28,32 @@ struct Memory memory;
 
 void CollectGarbage() {
   ++memory.num_collections;
-  printf("CollectGarbage: Beginning a garbage collection number %d\n", memory.num_collections);
+  LOG("Beginning a garbage collection number %d\n", memory.num_collections);
   // DEBUGGING: Clear unused objects to nil
   for (u64 i = 0; i < memory.max_objects; ++i) memory.new_objects[i] = nil;
-  printf("CollectGarbage: resetting the free pointer to 0\n");
+  LOG("resetting the free pointer to 0\n");
 
   // Reset the free pointer to the start of the new_objects
   memory.free = 0;
 
   // Move the root from the_objects to new_objects.
-  printf("CollectGarbage: Moving the root object: ");
+  LOG("Moving the root object: ");
   PrintlnObject(memory.root);
   memory.root = MoveObject(memory.root);
 
-  printf("CollectGarbage: Moved root. Free=%llu Beginning scan.\n", memory.free);
+  LOG("Moved root. Free=%llu Beginning scan.\n", memory.free);
   // Scan over the freshly moved objects
   //  if a reference to an old object is encountered, move it
   // when scan catches up to free, the entire memory has been scanned/moved.
   for (u64 scan = 0; scan < memory.free;) {
-    printf("CollectGarbage: Scanning object at %llu. Free=%llu\n", scan, memory.free);
+    LOG("Scanning object at %llu. Free=%llu\n", scan, memory.free);
     Object object = memory.new_objects[scan];
 
     // If the object is a blob, we can't scan its contents
     if (IsBlobHeader(object)) {
       u64 num_objects = NumObjectsPerBlob(UnboxBlobHeader(object));
       scan += num_objects;
-      printf("CollectGarbage: Encountered blob of size %llu objects. Scan=%llu\n", num_objects, scan);
+      LOG("Encountered blob of size %llu objects. Scan=%llu\n", num_objects, scan);
     } else {
       memory.new_objects[scan] = MoveObject(object);
       ++scan;
@@ -68,7 +69,7 @@ void CollectGarbage() {
 
 
 Object MoveObject(Object object) {
-  printf("  MoveObject: moving object: ");
+  LOG("moving object: ");
   PrintReference(object);
   printf("\n");
   // If it isn't tagged, it's a double float.
@@ -205,30 +206,30 @@ void TestMemory() {
   ByteVectorSet(byte_vector, 3, 0xe);
 
   Object shared = MakePair(byte_vector, string);
-  SetRegister(REGISTER_THE_OBJECT, MakePair(shared, MakePair(shared, vector)));
+  SetRegister(REGISTER_EXPRESSION, MakePair(shared, MakePair(shared, vector)));
 
-  printf("Old Root: ");
-  PrintlnObject(GetRegister(REGISTER_THE_OBJECT));
+  LOG("Old Root: ");
+  PrintlnObject(GetRegister(REGISTER_EXPRESSION));
   PrintMemory();
   CollectGarbage();
 
-  printf("New Root: ");
-  PrintlnObject(GetRegister(REGISTER_THE_OBJECT));
+  LOG("New Root: ");
+  PrintlnObject(GetRegister(REGISTER_EXPRESSION));
   PrintMemory();
 
   for (int i = 0; i < 1000; ++i) {
     MakePair(BoxFixnum(0), BoxFixnum(1));
   }
-  printf("Root: ");
-  PrintlnObject(GetRegister(REGISTER_THE_OBJECT));
-  printf("Allocated %llu objects, performed %llu garbage collections, moved %llu objects,\n"
+  LOG("Root: ");
+  PrintlnObject(GetRegister(REGISTER_EXPRESSION));
+  LOG("Allocated %llu objects, performed %llu garbage collections, moved %llu objects,\n"
       "on average: %llf objects allocated/collection, %llf objects moved/collection\n",
       memory.num_objects_allocated, memory.num_collections, memory.num_objects_moved,
       memory.num_objects_allocated * 1.0 / memory.num_collections,
       memory.num_objects_moved * 1.0 / memory.num_collections);
 
-  SetRegister(REGISTER_THE_OBJECT, nil);
-  SetRegister(REGISTER_THE_OBJECT, AllocateVector(30 - NUM_REGISTERS));
-  printf("Root: ");
-  PrintlnObject(GetRegister(REGISTER_THE_OBJECT));
+  SetRegister(REGISTER_EXPRESSION, nil);
+  SetRegister(REGISTER_EXPRESSION, AllocateVector(30 - NUM_REGISTERS));
+  LOG("Root: ");
+  PrintlnObject(GetRegister(REGISTER_EXPRESSION));
 }

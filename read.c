@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "log.h"
 #include "memory.h"
 #include "pair.h"
 #include "root.h"
@@ -34,7 +35,7 @@ b64 IsErrorToken(const struct Token *token);
 // Prints an error message and sets success to false.
 void HandleErrorToken(const struct Token *token, b64 *success);
 
-// Reads the next Object from source, leaving the resulting object in REGISTER_READ_OBJECT.
+// Reads the next Object from source, leaving the resulting object in REGISTER_EXPRESSION.
 // Returns the remaining unconsumed source.
 // success is marked as true upon reading the full object.
 const u8 *ReadNextObject(const u8 *source, b64 *success);
@@ -52,10 +53,10 @@ const u8 *ReadObject(const u8 *source, b64 *success) {
 }
 
 Object GetReadResult() {
-  return GetRegister(REGISTER_READ_RESULT);
+  return GetRegister(REGISTER_EXPRESSION);
 }
 void SetReadResult(Object object) {
-  SetRegister(REGISTER_READ_RESULT, object);
+  SetRegister(REGISTER_EXPRESSION, object);
 }
 
 Object PopReadStack() {
@@ -80,10 +81,10 @@ b64 IsErrorToken(const struct Token *token) {
 
 void HandleErrorToken(const struct Token *token, b64 *success) {
   if (token->type == TOKEN_UNTERMINATED_STRING) {
-    printf("Error: Unterminated string inside of list\n");
+    LOG_ERROR("Unterminated string inside of list\n");
     *success = 0;
   } else if (token->type == TOKEN_EOF) {
-    printf("Error: Unterminated list\n");
+    LOG_ERROR("Unterminated list\n");
     *success = 0;
   }
 }
@@ -152,10 +153,10 @@ const u8 *ReadNextObjectFromToken(const struct Token *token, const u8 *source, b
   } else if (IsErrorToken(token)) {
     HandleErrorToken(token, success);
   } else if (token->type == TOKEN_PAIR_SEPARATOR) {
-    printf("Error: Invalid placement for pair separator\n");
+    LOG_ERROR("Invalid placement for pair separator\n");
     *success = 0;
   } else if (token->type == TOKEN_LIST_CLOSE) {
-    printf("Error: Unmatched list close\n");
+    LOG_ERROR("Unmatched list close\n");
     *success = 0;
   }
   return source;
@@ -165,7 +166,7 @@ const u8 *ReadNextListObject(const struct Token *token, const u8 *source, b64 *s
   // (a b c d)
   //    ^-here
   source = ReadNextObjectFromToken(token, source, success);
-  printf("ReadNextListObject: Read in ");
+  LOG("Read in ");
   PrintlnObject(GetReadResult());
   if (!*success) return source;
   // (a b c d)
@@ -173,7 +174,7 @@ const u8 *ReadNextListObject(const struct Token *token, const u8 *source, b64 *s
   // stack: ((a . nil))
   PushReadStack(MakePair(GetReadResult(), nil));
   // REFERENCES INVALIDATED
-  printf("ReadNextListObject: pushing it onto the read stack: ");
+  LOG("pushing it onto the read stack: ");
   PrintlnObject(GetRegister(REGISTER_READ_STACK));
   
   // stack: ((b . nil) (a . nil))
@@ -181,19 +182,19 @@ const u8 *ReadNextListObject(const struct Token *token, const u8 *source, b64 *s
   if (!*success) return source;
   // (a b c d)
   //          ^-here
-  printf("ReadNextListObject: Read the rest of the list: ");
+  LOG("Read the rest of the list: ");
   PrintlnObject(GetReadResult());
 
   // stack: ((b . nil) (a . nil))
   // read result: (c . (d . nil))
   Object pair = PopReadStack();
-  printf("ReadNextListObject: popping the read stack: ");
+  LOG("popping the read stack: ");
   PrintlnObject(GetRegister(REGISTER_READ_STACK));
 
   // stack: ((a . nil))
   SetCdr(pair, GetReadResult());
   SetReadResult(pair);
-  printf("ReadNextListObject: setting the read result: ");
+  LOG("setting the read result: ");
   PrintlnObject(GetReadResult());
   // stack: ((a . nil))
   // read result: (b . (c . nil))
@@ -204,7 +205,7 @@ const u8 *BeginReadList(const u8 *source, b64 *success) {
   struct Token token;
   NextToken(source, &token);
   if (token.type == TOKEN_PAIR_SEPARATOR) {
-    printf("Error: Attempt to parse pair separator in the first position of list\n");
+    LOG_ERROR("Attempt to parse pair separator in the first position of list\n");
     *success = 0;
   }
   return ContinueReadList(source, success);
@@ -235,7 +236,7 @@ const u8 *ContinueReadList(const u8 *source, b64 *success) {
     // (... c . d)
     //            ^-here
     if (token.type != TOKEN_LIST_CLOSE) {
-      printf("Error: expected close-list after object following pair separator\n");
+      LOG_ERROR("expected close-list after object following pair separator\n");
       *success = 0;
       return source;
     }
@@ -392,13 +393,4 @@ void TestRead() {
   }
 
   DestroyMemory();
-}
-
-int main(int argc, char **argv) {
-  TestTag();
-  TestToken();
-  TestMemory();
-  TestSymbolTable();
-  TestRead();
-  return 0;
 }

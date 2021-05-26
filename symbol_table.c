@@ -71,16 +71,18 @@ void UninternSymbol(const u8 *name) {
 
 Object InternNewSymbol(u64 index, const u8 *name) {
   // Create a new symbol and add it to the symbol list
-  Object new_symbols =
-    MakePair(
-        AllocateSymbol(name),
-        VectorRef(GetSymbolTable(), index));
+  Object new_symbols = AllocatePair();
   // REFERENCES INVALIDATED
 
-  // Update the symbol table.
+  Object old_symbols = VectorRef(GetSymbolTable(), index);
   VectorSet(GetSymbolTable(), index, new_symbols);
+
+  SetCdr(new_symbols, old_symbols);
+  SetCar(new_symbols, AllocateSymbol(name));
+  // REFERENCES INVALIDATED
+
   // Return the new symbol.
-  return Car(new_symbols);
+  return Car(VectorRef(GetSymbolTable(), index));
 }
 
 u64 GetSymbolListIndex(Object symbol_table, const u8 *name) {
