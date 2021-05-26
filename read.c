@@ -20,8 +20,8 @@ void SetReadResult(Object object);
 
 // Pops the top of the Read stack
 Object PopReadStack();
-// Pushes pair onto the top of the Read stack.
-void PushReadStack(Object pair);
+// Pushes the (read_result . nil) onto the top of the read stack
+void PushReadResultOntoStack();
 // Reads the next Object from token, and then source.
 const u8 *ReadNextObjectFromToken(const struct Token *token, const u8 *source, b64 *success);
 
@@ -64,9 +64,16 @@ Object PopReadStack() {
   SetRegister(REGISTER_READ_STACK, Cdr(GetRegister(REGISTER_READ_STACK)));
   return top;
 }
-void PushReadStack(Object pair) {
-  SetRegister(REGISTER_READ_STACK,
-      MakePair(pair, GetRegister(REGISTER_READ_STACK)));
+
+void PushReadResultOntoStack() {
+  Object read_stack = AllocatePair();
+  SetCdr(read_stack, GetRegister(REGISTER_READ_STACK));
+  SetRegister(REGISTER_READ_STACK, read_stack);
+
+  Object pair = AllocatePair();
+  SetCar(pair, GetReadResult());
+
+  SetCar(GetRegister(REGISTER_READ_STACK), pair);
 }
 
 b64 IsErrorToken(const struct Token *token) {
@@ -145,8 +152,18 @@ const u8 *ReadNextObjectFromToken(const struct Token *token, const u8 *source, b
     if (!*success)
       return source;
 
-    SetReadResult(MakePair(FindSymbol("quote"), MakePair(GetReadResult(), nil)));
-    // REFERENCES INVALIDATED
+    // read-result: object
+    Object result = AllocatePair();
+    SetCar(result, GetReadResult());
+    SetCdr(result, nil);
+    SetReadResult(result);
+    // read-result: (object)
+
+    result = AllocatePair();
+    SetCar(result, FindSymbol("quote"));
+    SetCdr(result, GetReadResult());
+    SetReadResult(result);
+    // read-result: (quote object)
   } else if (token->type == TOKEN_LINE_COMMENT) {
     // discard
     source = ReadNextObject(source, success);
@@ -171,9 +188,8 @@ const u8 *ReadNextListObject(const struct Token *token, const u8 *source, b64 *s
   if (!*success) return source;
   // (a b c d)
   //     ^-here
-  // stack: ((a . nil))
-  PushReadStack(MakePair(GetReadResult(), nil));
-  // REFERENCES INVALIDATED
+  // stack: (a)
+  PushReadResultOntoStack();
   LOG("pushing it onto the read stack: ");
   PrintlnObject(GetRegister(REGISTER_READ_STACK));
   

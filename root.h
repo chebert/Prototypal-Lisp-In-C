@@ -10,9 +10,6 @@ void InitializeRoot();
 
 enum Register {
   REGISTER_SYMBOL_TABLE,
-  // Needed for MakePair
-  REGISTER_SAVED_CAR,
-  REGISTER_SAVED_CDR,
   // Needed for reading lists
   REGISTER_READ_STACK,
 
@@ -20,13 +17,11 @@ enum Register {
   REGISTER_VALUE,
   REGISTER_ENVIRONMENT,
   REGISTER_ARGUMENT_LIST,
+  REGISTER_UNEVALUATED,
   NUM_REGISTERS,
 };
 
 Object GetRegister(enum Register reg);
 void SetRegister(enum Register reg, Object value);
-
-void SavePair(Object car, Object cdr);
-void RestorePair(Object *car, Object *cdr);
 
 #endif

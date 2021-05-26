@@ -189,6 +189,15 @@ void PrintMemory() {
   printf(" |\n");
 }
 
+// Unsafe, only for testing
+Object MakePair(Object car, Object cdr) {
+  Object pair = AllocatePair();
+  // REFERENCES INVALIDATED
+  SetCar(pair, car);
+  SetCdr(pair, cdr);
+  return pair;
+}
+
 void TestMemory() {
   InitializeMemory(32);
   MakePair(BoxFixnum(4), BoxFixnum(2));

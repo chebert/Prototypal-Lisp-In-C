@@ -119,5 +119,9 @@ Object LookupVariableValue(Object variable, Object environment, b64 *found) {
   return nil;
 }
 
+Object MakeProcedure(Object parameters, Object body, Object environment) { return nil; }
+Object LambdaParameters(Object expression) { return nil; }
+Object LambdaBody(Object expression) { return nil; }
+
 void TestEvaluate() {
 }

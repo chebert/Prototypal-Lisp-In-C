@@ -67,17 +67,6 @@ void SetCdr(Object pair, Object value) {
 Object First(Object pair) { return Car(pair); }
 Object Rest(Object pair) { return Cdr(pair); }
 
-Object MakePair(Object car, Object cdr) {
-  SavePair(car, cdr);
-  Object pair = AllocatePair();
-  RestorePair(&car, &cdr);
-
-  SetCar(pair, car);
-  SetCdr(pair, cdr);
-
-  return pair;
-}
-
 void PrintPair(Object pair) {
   u64 reference = UnboxReference(pair);
   printf("(");

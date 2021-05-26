@@ -21,9 +21,6 @@ void SetCdr(Object pair, Object value);
 Object First(Object pair);
 Object Rest(Object pair);
 
-// Safely allocate a pair and set the car and cdr.
-Object MakePair(Object car, Object cdr);
-
 void PrintPair(Object pair);
 
 #endif
