@@ -145,7 +145,7 @@ const u8 *ReadNextObjectFromToken(const struct Token *token, const u8 *source, b
     if (!*success)
       return source;
 
-    SetReadResult(MakePair(InternSymbol("quote"), MakePair(GetReadResult(), nil)));
+    SetReadResult(MakePair(FindSymbol("quote"), MakePair(GetReadResult(), nil)));
     // REFERENCES INVALIDATED
   } else if (token->type == TOKEN_LINE_COMMENT) {
     // discard
@@ -261,6 +261,7 @@ b64 SymbolEq(Object symbol, const u8 *name) {
 void TestRead() {
   InitializeMemory(128);
   InitializeSymbolTable(1);
+  InternSymbol("quote");
   b64 success = 0;
 
   // Read string

@@ -1,4 +1,4 @@
-#include "eval.h"
+#include "evaluate.h"
 #include "memory.h"
 #include "tag.h"
 #include "token.h"
@@ -11,6 +11,6 @@ int main(int argc, char **argv) {
   TestMemory();
   TestSymbolTable();
   TestRead();
-  TestEval();
+  TestEvaluate();
   return 0;
 }
