@@ -194,7 +194,7 @@ void PrintMemory() {
 }
 
 // Unsafe, only for testing
-Object MakePair(Object car, Object cdr) {
+static Object MakePair(Object car, Object cdr) {
   Object pair = AllocatePair();
   // REFERENCES INVALIDATED
   SetCar(pair, car);

@@ -3,6 +3,7 @@
 #include <assert.h>
 
 #include "compound_procedure.h"
+#include "environment.h"
 #include "log.h"
 #include "memory.h"
 #include "pair.h"
@@ -35,11 +36,13 @@ void EvaluateApplication();
 void EvaluateApplicationDispatch();
 void EvaluateUnknown();
 
+static Object MakePair(enum Register car, enum Register cdr);
+static Object MakeProcedure(enum Register environment, enum Register parameters, enum Register body);
+
 // Environment
 Object LookupVariableValue(Object variable, Object environment, b64 *found);
 void SetVariableValue(Object variable, Object value, Object environment);
-void DefineVariable(Object variable, Object value, Object environment);
-Object ExtendEnvironment(Object parameters, Object arguments, Object environment);
+void DefineVariable(enum Register variable, enum Register value, enum Register environment);
 
 // Lambda
 Object LambdaParameters(Object expression);
@@ -70,8 +73,6 @@ Object EmptyArgumentList();
 Object FirstOperand(Object operands);
 Object RestOperands(Object operands);
 b64 IsLastOperand(Object operands);
-
-void PushValueOntoArgumentList();
 
 // Sequence
 Object FirstExpression(Object sequence);
@@ -153,13 +154,7 @@ void EvaluateLambda() {
   Object expression = GetRegister(REGISTER_EXPRESSION);
   SetRegister(REGISTER_UNEVALUATED, LambdaParameters(expression));
   SetRegister(REGISTER_EXPRESSION, LambdaBody(expression));
-
-  Object procedure = AllocateCompoundProcedure();
-  SetProcedureEnvironment(procedure, GetRegister(REGISTER_ENVIRONMENT));
-  SetProcedureParameters(procedure, GetRegister(REGISTER_UNEVALUATED));
-  SetProcedureBody(procedure, GetRegister(REGISTER_EXPRESSION));
-
-  SetRegister(REGISTER_VALUE, procedure);
+  SetRegister(REGISTER_VALUE, MakeProcedure(REGISTER_ENVIRONMENT, REGISTER_UNEVALUATED, REGISTER_EXPRESSION));
 }
 
 void EvaluateApplication() {
@@ -194,7 +189,7 @@ void EvaluateApplication() {
 
       Restore(REGISTER_ARGUMENT_LIST);
       // Add it to the argument list.
-      PushValueOntoArgumentList();
+      SetRegister(REGISTER_ARGUMENT_LIST, MakePair(REGISTER_VALUE, REGISTER_ARGUMENT_LIST));
       // Perform the application
       EvaluateApplicationDispatch();
       return;
@@ -211,7 +206,7 @@ void EvaluateApplication() {
     Restore(REGISTER_ARGUMENT_LIST);
 
     // Add the evaluated argument to the argument list.
-    PushValueOntoArgumentList();
+    SetRegister(REGISTER_ARGUMENT_LIST, MakePair(REGISTER_VALUE, REGISTER_ARGUMENT_LIST));
     // Remove the evaluated operand from the unevaluated arguments
     SetRegister(REGISTER_UNEVALUATED, RestOperands(GetRegister(REGISTER_UNEVALUATED)));
   }
@@ -226,8 +221,7 @@ void EvaluateApplicationDispatch() {
     Object environment = ProcedureEnvironment(proc);
     SetRegister(REGISTER_UNEVALUATED, params);
     SetRegister(REGISTER_ENVIRONMENT, environment);
-    SetRegister(REGISTER_ENVIRONMENT,
-        ExtendEnvironment(params, GetRegister(REGISTER_ARGUMENT_LIST), environment));
+    ExtendEnvironment(REGISTER_UNEVALUATED, REGISTER_ARGUMENT_LIST, REGISTER_ENVIRONMENT);
 
     SetRegister(REGISTER_UNEVALUATED, ProcedureBody(proc));
     EvaluateSequence();
@@ -268,10 +262,7 @@ void EvaluateDefinition() {
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_EXPRESSION);
   Restore(REGISTER_UNEVALUATED);
-  DefineVariable(
-      GetRegister(REGISTER_UNEVALUATED),
-      GetRegister(REGISTER_VALUE),
-      GetRegister(REGISTER_ENVIRONMENT));
+  DefineVariable(REGISTER_UNEVALUATED, REGISTER_VALUE, REGISTER_ENVIRONMENT);
   // Return the symbol name as the result of the definition.
   SetRegister(REGISTER_VALUE, GetRegister(REGISTER_UNEVALUATED));
 }
@@ -331,19 +322,6 @@ Object Second(Object list) { return Car(Cdr(list)); }
 Object Third(Object list) { return Car(Cdr(Cdr(list))); }
 Object Fourth(Object list) { return Car(Cdr(Cdr(Cdr(list)))); }
 
-Object LookupVariableValue(Object variable, Object environment, b64 *found) { 
-  assert(!"TODO");
-}
-void SetVariableValue(Object variable, Object value, Object environment) { 
-  assert(!"TODO");
-}
-void DefineVariable(Object variable, Object value, Object environment) { 
-  assert(!"TODO");
-}
-Object ExtendEnvironment(Object parameters, Object arguments, Object environment) { 
-  assert(!"TODO");
-}
-
 Object ApplyPrimitiveProcedure(Object procedure, Object arguments) { 
   PrimitiveFunction function = UnboxPrimitiveProcedure(procedure);
   return function(arguments);
@@ -396,17 +374,24 @@ Object FirstOperand(Object operands) { return Car(operands); }
 Object RestOperands(Object operands) { return Cdr(operands); }
 b64 IsLastOperand(Object operands) { return HasNoOperands(RestOperands(operands)); }
 
-void PushValueOntoArgumentList() {
-  Object pair = AllocatePair();
-  SetCar(pair, GetRegister(REGISTER_VALUE));
-  SetCdr(pair, GetRegister(REGISTER_ARGUMENT_LIST));
-  SetRegister(REGISTER_ARGUMENT_LIST, GetRegister(REGISTER_ARGUMENT_LIST));
-}
-
 // Sequence
 Object FirstExpression(Object sequence) { return First(sequence); }
 Object RestExpressions(Object sequence) { return Rest(sequence); }
 b64 IsLastExpression(Object sequence) { return Rest(sequence) == nil; }
+
+Object MakePair(enum Register car, enum Register cdr) {
+  Object pair = AllocatePair();
+  SetCar(pair, GetRegister(car));
+  SetCdr(pair, GetRegister(cdr));
+  return pair;
+}
+Object MakeProcedure(enum Register environment, enum Register parameters, enum Register body) {
+  Object procedure = AllocateCompoundProcedure();
+  SetProcedureEnvironment(procedure, GetRegister(environment));
+  SetProcedureParameters(procedure, GetRegister(parameters));
+  SetProcedureBody(procedure, GetRegister(body));
+  return procedure;
+}
 
 void TestEvaluate() {
 }

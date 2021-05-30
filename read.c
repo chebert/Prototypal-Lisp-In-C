@@ -13,14 +13,9 @@
 #include "symbol_table.h"
 #include "token.h"
 
-// Returns the current memory-register read result
-Object GetReadResult();
-// Sets the current memory-register read result to object
-void SetReadResult(Object object);
-
 // Pops the top of the Read stack
 Object PopReadStack();
-// Pushes the (read_result . nil) onto the top of the read stack
+// Pushes the (read_result . nil) onto the top of the read stack. TODO: can we just push read_result?
 void PushReadResultOntoStack();
 // Reads the next Object from token, and then source.
 const u8 *ReadNextObjectFromToken(const struct Token *token, const u8 *source, b64 *success);
@@ -49,13 +44,6 @@ const u8 *ReadObject(const u8 *source, b64 *success) {
   return ReadNextObject(source, success);
 }
 
-Object GetReadResult() {
-  return GetRegister(REGISTER_EXPRESSION);
-}
-void SetReadResult(Object object) {
-  SetRegister(REGISTER_EXPRESSION, object);
-}
-
 Object PopReadStack() {
   Object top = Car(GetRegister(REGISTER_STACK));
   SetRegister(REGISTER_STACK, Cdr(GetRegister(REGISTER_STACK)));
@@ -68,7 +56,7 @@ void PushReadResultOntoStack() {
   SetRegister(REGISTER_STACK, read_stack);
 
   Object pair = AllocatePair();
-  SetCar(pair, GetReadResult());
+  SetCar(pair, GetRegister(REGISTER_EXPRESSION));
 
   SetCar(GetRegister(REGISTER_STACK), pair);
 }
@@ -141,7 +129,7 @@ const u8 *ReadNextObject(const u8 *source, b64 *success) {
 
 const u8 *ReadNextObjectFromToken(const struct Token *token, const u8 *source, b64 *success) {
   if (IsSingleToken(token)) {
-    SetReadResult(ProcessSingleToken(token, success));
+    SetRegister(REGISTER_EXPRESSION, ProcessSingleToken(token, success));
   } else if (token->type == TOKEN_LIST_OPEN) {
     source = BeginReadList(source, success);
   } else if (token->type == TOKEN_SYMBOLIC_QUOTE) {
@@ -151,15 +139,15 @@ const u8 *ReadNextObjectFromToken(const struct Token *token, const u8 *source, b
 
     // read-result: object
     Object result = AllocatePair();
-    SetCar(result, GetReadResult());
+    SetCar(result, GetRegister(REGISTER_EXPRESSION));
     SetCdr(result, nil);
-    SetReadResult(result);
+    SetRegister(REGISTER_EXPRESSION, result);
     // read-result: (object)
 
     result = AllocatePair();
     SetCar(result, FindSymbol("quote"));
-    SetCdr(result, GetReadResult());
-    SetReadResult(result);
+    SetCdr(result, GetRegister(REGISTER_EXPRESSION));
+    SetRegister(REGISTER_EXPRESSION, result);
     // read-result: (quote object)
   } else if (token->type == TOKEN_LINE_COMMENT) {
     // discard
@@ -181,7 +169,7 @@ const u8 *ReadNextListObject(const struct Token *token, const u8 *source, b64 *s
   //    ^-here
   source = ReadNextObjectFromToken(token, source, success);
   LOG("Read in ");
-  PrintlnObject(GetReadResult());
+  PrintlnObject(GetRegister(REGISTER_EXPRESSION));
   if (!*success) return source;
   // (a b c d)
   //     ^-here
@@ -196,7 +184,7 @@ const u8 *ReadNextListObject(const struct Token *token, const u8 *source, b64 *s
   // (a b c d)
   //          ^-here
   LOG("Read the rest of the list: ");
-  PrintlnObject(GetReadResult());
+  PrintlnObject(GetRegister(REGISTER_EXPRESSION));
 
   // stack: ((b . nil) (a . nil))
   // read result: (c . (d . nil))
@@ -205,10 +193,10 @@ const u8 *ReadNextListObject(const struct Token *token, const u8 *source, b64 *s
   PrintlnObject(GetRegister(REGISTER_STACK));
 
   // stack: ((a . nil))
-  SetCdr(pair, GetReadResult());
-  SetReadResult(pair);
+  SetCdr(pair, GetRegister(REGISTER_EXPRESSION));
+  SetRegister(REGISTER_EXPRESSION, pair);
   LOG("setting the read result: ");
-  PrintlnObject(GetReadResult());
+  PrintlnObject(GetRegister(REGISTER_EXPRESSION));
   // stack: ((a . nil))
   // read result: (b . (c . nil))
   return source;
@@ -235,7 +223,7 @@ const u8 *ContinueReadList(const u8 *source, b64 *success) {
   //                        ^-here
   if (token.type == TOKEN_LIST_CLOSE) {
     // read result: ()
-    SetReadResult(nil);
+    SetRegister(REGISTER_EXPRESSION, nil);
 
   // List ends with a dotted pair
   } else if (token.type == TOKEN_PAIR_SEPARATOR) {
@@ -282,8 +270,8 @@ void TestRead() {
     const u8* source = "\"abra\"";
     source = ReadObject(source, &success);
     assert(success);
-    assert(IsString(GetReadResult()));
-    assert(!strcmp("abra", StringCharacterBuffer(GetReadResult())));
+    assert(IsString(GetRegister(REGISTER_EXPRESSION)));
+    assert(!strcmp("abra", StringCharacterBuffer(GetRegister(REGISTER_EXPRESSION))));
   }
 
   // Read integer
@@ -291,8 +279,8 @@ void TestRead() {
     const u8* source = "-12345";
     source = ReadObject(source, &success);
     assert(success);
-    assert(IsFixnum(GetReadResult()));
-    assert(-12345 == UnboxFixnum(GetReadResult()));
+    assert(IsFixnum(GetRegister(REGISTER_EXPRESSION)));
+    assert(-12345 == UnboxFixnum(GetRegister(REGISTER_EXPRESSION)));
   }
 
   // Read real64
@@ -300,8 +288,8 @@ void TestRead() {
     const u8* source = "-123.4e5";
     source = ReadObject(source, &success);
     assert(success);
-    assert(IsReal64(GetReadResult()));
-    assert(-123.4e5 == UnboxReal64(GetReadResult()));
+    assert(IsReal64(GetRegister(REGISTER_EXPRESSION)));
+    assert(-123.4e5 == UnboxReal64(GetRegister(REGISTER_EXPRESSION)));
   }
 
   // Read symbol
@@ -309,8 +297,8 @@ void TestRead() {
     const u8* source = "the-symbol";
     source = ReadObject(source, &success);
     assert(success);
-    assert(SymbolEq(GetReadResult(), "the-symbol"));
-    assert(!strcmp("the-symbol", StringCharacterBuffer(GetReadResult())));
+    assert(SymbolEq(GetRegister(REGISTER_EXPRESSION), "the-symbol"));
+    assert(!strcmp("the-symbol", StringCharacterBuffer(GetRegister(REGISTER_EXPRESSION))));
   }
 
   // Read ()
@@ -318,7 +306,7 @@ void TestRead() {
     const u8* source = " (     \n)";
     source = ReadObject(source, &success);
     assert(success);
-    assert(IsNil(GetReadResult()));
+    assert(IsNil(GetRegister(REGISTER_EXPRESSION)));
   }
 
   // Read Pair
@@ -326,9 +314,9 @@ void TestRead() {
     const u8* source = " (a . b)";
     source = ReadObject(source, &success);
     assert(success);
-    assert(IsPair(GetReadResult()));
-    assert(SymbolEq(Car(GetReadResult()), "a"));
-    assert(SymbolEq(Cdr(GetReadResult()), "b"));
+    assert(IsPair(GetRegister(REGISTER_EXPRESSION)));
+    assert(SymbolEq(Car(GetRegister(REGISTER_EXPRESSION)), "a"));
+    assert(SymbolEq(Cdr(GetRegister(REGISTER_EXPRESSION)), "b"));
   }
 
   // Read List
@@ -336,9 +324,9 @@ void TestRead() {
     const u8* source = " (a)";
     source = ReadObject(source, &success);
     assert(success);
-    assert(IsPair(GetReadResult()));
-    assert(SymbolEq(Car(GetReadResult()), "a"));
-    assert(IsNil(Cdr(GetReadResult())));
+    assert(IsPair(GetRegister(REGISTER_EXPRESSION)));
+    assert(SymbolEq(Car(GetRegister(REGISTER_EXPRESSION)), "a"));
+    assert(IsNil(Cdr(GetRegister(REGISTER_EXPRESSION))));
   }
 
   // Read Dotted list: nested
@@ -347,7 +335,7 @@ void TestRead() {
     //                    st      uv         w
     source = ReadObject(source, &success);
     assert(success);
-    Object s = GetReadResult(s);
+    Object s = GetRegister(REGISTER_EXPRESSION);
     Object t = Car(s);
     Object u = Cdr(s);
     Object v = Car(u);
@@ -367,7 +355,7 @@ void TestRead() {
     //                   s t uv w      xy z  S
     source = ReadObject(source, &success);
     assert(success);
-    Object s = GetReadResult();
+    Object s = GetRegister(REGISTER_EXPRESSION);
     Object t = Cdr(s);
     Object u = Cdr(t);
     Object v = Car(u);
@@ -396,7 +384,7 @@ void TestRead() {
     //  s        tu    v
     source = ReadObject(source, &success);
     assert(success);
-    Object s = GetReadResult();
+    Object s = GetRegister(REGISTER_EXPRESSION);
     Object t = Cdr(s);
     Object u = Car(t);
     Object v = Cdr(u);
