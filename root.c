@@ -1,6 +1,7 @@
 #include "root.h"
 
 #include "memory.h"
+#include "pair.h"
 #include "symbol_table.h"
 #include "vector.h"
 
@@ -14,4 +15,16 @@ Object GetRegister(enum Register reg) {
 
 void SetRegister(enum Register reg, Object value) {
   VectorSet(memory.root, reg, value); 
+}
+
+void Save(enum Register reg) {
+  Object stack = AllocatePair();
+  SetCar(stack, GetRegister(reg));
+  SetCdr(stack, GetRegister(REGISTER_STACK));
+  SetRegister(REGISTER_STACK, stack);
+}
+void Restore(enum Register reg) {
+  Object value = Car(GetRegister(REGISTER_STACK));
+  SetRegister(reg, value);
+  SetRegister(REGISTER_STACK, Cdr(REGISTER_STACK));
 }

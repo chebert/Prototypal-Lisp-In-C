@@ -17,6 +17,7 @@
 // Objects are u64 so that we can easily perform bit manipulations.
 typedef u64      Object;
 
+
 // Type Tags for Objects
 enum Tag {
   // Tag-only types (no payload)
@@ -27,6 +28,7 @@ enum Tag {
   // Primitive Types
   TAG_FIXNUM, // Fixnum is a 47-bit signed integer
   TAG_REAL32, // 32-bit float
+  TAG_PRIMITIVE_PROCEDURE, // An object holding a C function pointer.
 
   // Reference Types (Payloads are indices into memory vectors)
   TAG_PAIR, // Pair consists of two Objects
@@ -34,6 +36,7 @@ enum Tag {
   TAG_BYTE_VECTOR, // Byte vector consists of a length N, followed by at least N bytes
   TAG_STRING, // String consists of a length N, followed by at least N+1 bytes. String is 0-terminated
   TAG_SYMBOL, // Symbol is a string with a different tag.
+  TAG_COMPOUND_PROCEDURE, // Compound procedure consists of 3 Objects
 
   // GC Types (Types not directly accessible)
   TAG_BROKEN_HEART, // Used to annotate referenced objects that have been moved during garbage collection.
@@ -64,18 +67,24 @@ b64 IsVector(Object object);
 b64 IsByteVector(Object object);
 b64 IsString(Object object);
 b64 IsSymbol(Object object);
+b64 IsPrimitiveProcedure(Object object);
+b64 IsCompoundProcedure(Object object);
+
+typedef Object (*PrimitiveFunction)(Object arguments);
 
 // Construct boxed values given native C types
 Object BoxFixnum(s64 fixnum); // Truncates to 47 bits
 Object BoxBoolean(b64 boolean);
 Object BoxReal32(real32 value);
 Object BoxReal64(real64 value);
+Object BoxPrimitiveProcedure(PrimitiveFunction proc);
 // Construct referential data structures. References are indices.
 Object BoxPair(u64 reference);
 Object BoxVector(u64 reference);
 Object BoxByteVector(u64 reference);
 Object BoxString(u64 reference);
 Object BoxSymbol(u64 reference);
+Object BoxCompoundProcedure(u64 reference);
 // Box GC Types
 Object BoxBrokenHeart(u64 reference);
 Object BoxBlobHeader(u64 num_bytes);
@@ -89,6 +98,7 @@ s64    UnboxFixnum(Object object);
 b64    UnboxBoolean(Object object);
 real32 UnboxReal32(Object object);
 real64 UnboxReal64(Object object);
+PrimitiveFunction UnboxPrimitiveProcedure(u64 reference);
 // Unbox Pair, Vector, Byte Vector, String, Symbol
 u64 UnboxReference(Object object);
 // Unbox GC Types

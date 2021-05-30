@@ -7,6 +7,7 @@
 
 #include "blob.h"
 #include "byte_vector.h"
+#include "compound_procedure.h"
 #include "log.h"
 #include "pair.h"
 #include "root.h"
@@ -85,11 +86,12 @@ Object MoveObject(Object object) {
       return MovePrimitive(object);
 
     // Reference Objects
-    case TAG_PAIR:        return       MovePair(object);
-    case TAG_STRING:      return     MoveString(object);
-    case TAG_SYMBOL:      return     MoveSymbol(object);
-    case TAG_VECTOR:      return     MoveVector(object);
-    case TAG_BYTE_VECTOR: return MoveByteVector(object);
+    case TAG_PAIR:               return MovePair(object);
+    case TAG_STRING:             return MoveString(object);
+    case TAG_SYMBOL:             return MoveSymbol(object);
+    case TAG_VECTOR:             return MoveVector(object);
+    case TAG_BYTE_VECTOR:        return MoveByteVector(object);
+    case TAG_COMPOUND_PROCEDURE: return MoveCompoundProcedure(object);
   }
 
   assert(!"Error: unrecognized object");
@@ -143,11 +145,12 @@ void PrintObject(Object object) {
     case TAG_REAL32: printf("%ff",  UnboxReal32(object)); break;
 
     // Reference Objects
-    case TAG_PAIR:              PrintPair(object); break;
-    case TAG_VECTOR:          PrintVector(object); break;
-    case TAG_STRING:          PrintString(object); break;
-    case TAG_SYMBOL:          PrintSymbol(object); break;
-    case TAG_BYTE_VECTOR: PrintByteVector(object); break;
+    case TAG_PAIR:               PrintPair(object);              break;
+    case TAG_VECTOR:             PrintVector(object);            break;
+    case TAG_STRING:             PrintString(object);            break;
+    case TAG_SYMBOL:             PrintSymbol(object);            break;
+    case TAG_BYTE_VECTOR:        PrintByteVector(object);        break;
+    case TAG_COMPOUND_PROCEDURE: PrintCompoundProcedure(object); break;
   }
 }
 
@@ -165,13 +168,14 @@ void PrintReference(Object object) {
       case TAG_TRUE:   printf("true");  break;
       case TAG_FALSE:  printf("false"); break;
       case TAG_FIXNUM: printf("%lld", UnboxFixnum(object)); break;
-      case TAG_REAL32: printf("%ff", UnboxReal32(object));  break;
+      case TAG_REAL32: printf( "%ff", UnboxReal32(object)); break;
       // Reference Objects
-      case TAG_PAIR:        printf("<Pair %llu>",       UnboxReference(object)); break;
-      case TAG_STRING:      printf("<String %llu>",     UnboxReference(object)); break;
-      case TAG_SYMBOL:      printf("<Symbol %llu>",     UnboxReference(object)); break;
-      case TAG_VECTOR:      printf("<Vector %llu>",     UnboxReference(object)); break;
-      case TAG_BYTE_VECTOR: printf("<ByteVector %llu>", UnboxReference(object)); break;
+      case TAG_PAIR:               printf("<Pair %llu>",              UnboxReference(object)); break;
+      case TAG_STRING:             printf("<String %llu>",            UnboxReference(object)); break;
+      case TAG_SYMBOL:             printf("<Symbol %llu>",            UnboxReference(object)); break;
+      case TAG_VECTOR:             printf("<Vector %llu>",            UnboxReference(object)); break;
+      case TAG_BYTE_VECTOR:        printf("<ByteVector %llu>",        UnboxReference(object)); break;
+      case TAG_COMPOUND_PROCEDURE: printf("<CompoundProcedure %llu>", UnboxReference(object)); break;
     }
   }
 }

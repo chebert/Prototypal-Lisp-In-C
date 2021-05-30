@@ -99,11 +99,13 @@ b64 IsBoolean(Object object) {
   return 0;
 }
 
-b64 IsPair(Object object)        { return HasTag(object, TAG_PAIR); }
-b64 IsVector(Object object)      { return HasTag(object, TAG_VECTOR); }
-b64 IsByteVector(Object object)  { return HasTag(object, TAG_BYTE_VECTOR); }
-b64 IsString(Object object)      { return HasTag(object, TAG_STRING); }
-b64 IsSymbol(Object object)      { return HasTag(object, TAG_SYMBOL); }
+b64 IsPair(Object object)               { return HasTag(object, TAG_PAIR); }
+b64 IsVector(Object object)             { return HasTag(object, TAG_VECTOR); }
+b64 IsByteVector(Object object)         { return HasTag(object, TAG_BYTE_VECTOR); }
+b64 IsString(Object object)             { return HasTag(object, TAG_STRING); }
+b64 IsSymbol(Object object)             { return HasTag(object, TAG_SYMBOL); }
+b64 IsCompoundProcedure(Object object)  { return HasTag(object, TAG_COMPOUND_PROCEDURE); }
+b64 IsPrimitiveProcedure(Object object) { return HasTag(object, TAG_PRIMITIVE_PROCEDURE); }
 
 Object TagPayload(u64 payload, enum Tag tag) {
   return TAGGED_OBJECT_MASK | SHIFT_LEFT(tag, TAG_SHIFT) | payload;
@@ -114,18 +116,25 @@ Object true  = TAGGED_OBJECT_MASK | SHIFT_LEFT(TAG_TRUE,  TAG_SHIFT);
 Object false = TAGGED_OBJECT_MASK | SHIFT_LEFT(TAG_FALSE, TAG_SHIFT);
 
 // TODO: Maintain sign when truncating?
-Object BoxFixnum(s64 fixnum)        { return TagPayload(PAYLOAD_MASK & fixnum, TAG_FIXNUM); }
-Object BoxBoolean(b64 boolean)      { return TagPayload(0, boolean ? TAG_TRUE : TAG_FALSE); }
-Object BoxReal32(real32 value)      { return TagPayload(Real32ToU32(value),    TAG_REAL32); }
-Object BoxPair(u64 reference)       { return TagPayload(PAYLOAD_MASK & reference, TAG_PAIR); }
-Object BoxVector(u64 reference)     { return TagPayload(PAYLOAD_MASK & reference, TAG_VECTOR); }
-Object BoxByteVector(u64 reference) { return TagPayload(PAYLOAD_MASK & reference, TAG_BYTE_VECTOR); }
-Object BoxString(u64 reference)     { return TagPayload(PAYLOAD_MASK & reference, TAG_STRING); }
-Object BoxSymbol(u64 reference)     { return TagPayload(PAYLOAD_MASK & reference, TAG_SYMBOL); }
+Object BoxFixnum(s64 fixnum)               { return TagPayload(PAYLOAD_MASK & fixnum, TAG_FIXNUM); }
+Object BoxBoolean(b64 boolean)             { return TagPayload(0, boolean ? TAG_TRUE : TAG_FALSE); }
+Object BoxReal32(real32 value)             { return TagPayload(Real32ToU32(value), TAG_REAL32); }
+Object BoxPair(u64 reference)              { return TagPayload(PAYLOAD_MASK & reference, TAG_PAIR); }
+Object BoxVector(u64 reference)            { return TagPayload(PAYLOAD_MASK & reference, TAG_VECTOR); }
+Object BoxByteVector(u64 reference)        { return TagPayload(PAYLOAD_MASK & reference, TAG_BYTE_VECTOR); }
+Object BoxString(u64 reference)            { return TagPayload(PAYLOAD_MASK & reference, TAG_STRING); }
+Object BoxSymbol(u64 reference)            { return TagPayload(PAYLOAD_MASK & reference, TAG_SYMBOL); }
+Object BoxCompoundProcedure(u64 reference) { return TagPayload(PAYLOAD_MASK & reference, TAG_COMPOUND_PROCEDURE); }
 
 Object BoxReal64(real64 value)       { return Real64ToU64(value); }
 Object BoxBrokenHeart(u64 reference) { return TagPayload(reference, TAG_BROKEN_HEART); }
 Object BoxBlobHeader(u64 num_bytes)  { return TagPayload(num_bytes, TAG_BLOB_HEADER); }
+Object BoxPrimitiveProcedure(PrimitiveFunction function) {
+  u64 address = (u64)function;
+  // ensure address fits inside the payload
+  assert(address < SHIFT_LEFT(1, TAG_SHIFT));
+  return TagPayload(address, TAG_PRIMITIVE_PROCEDURE);
+}
 
 s64 UnboxFixnum(Object object) {
   u64 sign_bit_mask = SHIFT_LEFT(1, TAG_SHIFT-1); 
@@ -142,6 +151,9 @@ real32 UnboxReal32(Object object)     { return U32ToReal32((u32)(0xffffffff & ob
 real64 UnboxReal64(Object object)     { return U64ToReal64(object); }
 u64    UnboxReference(Object object)  { return (PAYLOAD_MASK & object); }
 u64    UnboxBlobHeader(Object object) { return (PAYLOAD_MASK & object); }
+PrimitiveFunction UnboxPrimitiveProcedure(Object object) {
+  return (PrimitiveFunction)(PAYLOAD_MASK & object);
+}
 
 // Just for testing.
 s64 TwosComplement(u64 value) { return (s64)(~value + 1); }

@@ -40,8 +40,8 @@ Object MovePair(Object pair) {
   // Old: [ ..., car, cdr, ... ]
   memory.new_objects[memory.free++] = old_car;
   memory.new_objects[memory.free++] = memory.the_objects[ref+1];
-  memory.the_objects[ref] = BoxBrokenHeart(new_reference);
   // New: [ ..., car, cdr, free.. ]
+  memory.the_objects[ref] = BoxBrokenHeart(new_reference);
   // Old: [ ...,  <BH new>, ... ]
   return moved_pair;
 }
