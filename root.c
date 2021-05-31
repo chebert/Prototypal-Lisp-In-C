@@ -26,7 +26,7 @@ void Save(enum Register reg) {
 void Restore(enum Register reg) {
   Object value = Car(GetRegister(REGISTER_STACK));
   SetRegister(reg, value);
-  SetRegister(REGISTER_STACK, Cdr(REGISTER_STACK));
+  SetRegister(REGISTER_STACK, Cdr(GetRegister(REGISTER_STACK)));
 }
 
 EvaluateFunction GetContinue() {
@@ -53,6 +53,3 @@ void SetProcedure(Object o) { SetRegister(REGISTER_PROCEDURE, o); }
 
 Object GetArgumentList() { return GetRegister(REGISTER_ARGUMENT_LIST); }
 void SetArgumentList(Object o) { SetRegister(REGISTER_ARGUMENT_LIST, o); }
-
-EvaluateFunction GetContinue() { return GetRegister(REGISTER_CONTINUE); }
-void SetContinue(EvaluateFunction func) { SetRegister(REGISTER_CONTINUE, o); }

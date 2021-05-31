@@ -31,17 +31,21 @@ void SetVariableValue(Object variable, Object value, Object environment) {
 }
 
 void DefineVariable(enum Register variable, enum Register value, enum Register environment) {
+  // Environment := (scope . more-scopes)
+  // Scope       := (variables . values)
   {
     Object variables = AllocatePair();
     SetCar(variables, GetRegister(variable));
-    SetCdr(variables, Car(Car(GetRegister(environment))));
-    SetCar(Car(GetRegister(environment)), variables);
+    Object scope = Car(GetRegister(environment));
+    SetCdr(variables, Car(scope));
+    SetCar(scope, variables);
   }
   {
     Object values = AllocatePair();
     SetCar(values, GetRegister(value));
-    SetCdr(values, Cdr(Car(GetRegister(environment))));
-    SetCdr(Car(GetRegister(environment)), values);
+    Object scope = Car(GetRegister(environment));
+    SetCdr(values, Cdr(scope));
+    SetCdr(scope, values);
   }
 }
 
@@ -53,15 +57,16 @@ void ExtendEnvironment(enum Register parameters, enum Register arguments, enum R
   }
 
   Object new_scope = AllocatePair();
-  SetCar(new_scope, parameters);
-  SetCdr(new_scope, arguments);
+  SetCar(new_scope, GetRegister(parameters));
+  SetCdr(new_scope, GetRegister(arguments));
 
   SetCar(GetRegister(environment), new_scope);
 }
 
 Object LookupVariableReference(Object variable, Object environment) {
   for (; !IsNil(environment); environment = Cdr(environment)) {
-    Object pair = LookupVariableInScope(Car(environment), variable);
+    Object scope = Car(environment);
+    Object pair = LookupVariableInScope(variable, scope);
     if (!IsNil(pair)) return pair;
   }
   return nil;

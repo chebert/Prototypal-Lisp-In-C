@@ -23,6 +23,9 @@ b64 IsLambda(Object expression);
 b64 IsSequence(Object expression);
 b64 IsApplication(Object expression);
 
+Object Evaluate(Object expression);
+
+// EvaluateFunctions
 void EvaluateDispatch();
 void EvaluateSelfEvaluating();
 void EvaluateVariable();
@@ -38,12 +41,23 @@ void EvaluateApplicationOperands();
 void EvaluateApplicationDispatch();
 void EvaluateUnknown();
 
+void EvaluateApplicationOperandLoop();
+void EvaluateApplicationAccumulateArgument();
+void EvaluateApplicationAccumulateLastArgument();
+void EvaluateApplicationLastOperand();
+
+void EvaluateSequenceContinue();
+void EvaluateSequenceLastExpression();
+
+void EvaluateIfDecide();
+void EvaluateAssignment1();
+void EvaluateDefinition1();
+
 static Object MakeProcedure();
 
-// Environment
-Object LookupVariableValue(Object variable, Object environment, b64 *found);
-void SetVariableValue(Object variable, Object value, Object environment);
-void DefineVariable(enum Register variable, enum Register value, enum Register environment);
+Object Second(Object list);
+Object Third(Object list);
+Object Fourth(Object list);
 
 // Lambda
 Object LambdaParameters(Object expression);
@@ -67,6 +81,8 @@ Object IfAlternative(Object expression);
 b64 IsTruthy(Object condition);
 
 // Application
+void AdjoinArgument();
+
 Object Operands(Object application);
 Object Operator(Object application);
 b64 HasNoOperands(Object operands);
@@ -81,20 +97,44 @@ Object FirstExpression(Object sequence);
 Object RestExpressions(Object sequence);
 b64 IsLastExpression(Object sequence);
 
-EvaluateFunction next;
+static EvaluateFunction next;
 
-// Registers
+Object AddFixnumFixnum(Object arguments) {
+  Object a = First(arguments);
+  Object b = Second(arguments);
+  return BoxFixnum(UnboxFixnum(a) + UnboxFixnum(b));
+}
 
-void Evaluate() {
+Object Evaluate(Object expression) {
+  SetExpression(expression);
+  SetRegister(REGISTER_STACK, nil);
+  InternSymbol("quote");
+  InternSymbol("set!");
+  InternSymbol("define");
+  InternSymbol("if");
+  InternSymbol("fn");
+  InternSymbol("begin");
+  InternSymbol("ok");
+  // TODO: fill the global environment
+  SetEnvironment(AllocatePair());
+  SetCar(GetEnvironment(), AllocatePair());
+  SetUnevaluated(InternSymbol("+"));
+  SetValue(BoxPrimitiveProcedure(AddFixnumFixnum));
+  DefineVariable(REGISTER_UNEVALUATED, REGISTER_VALUE, REGISTER_ENVIRONMENT);
+
+  SetContinue(NULL);
   next = EvaluateDispatch;
+
   while (next)
     next();
+
+  return GetValue();
 }
 
 void EvaluateDispatch() {
-  // TODO: environment needs
-  //   - symbols interned: quote, set!, define, if, fn, ok
   Object expression = GetExpression();
+  LOG("Evaluating expression:");
+  PrintlnObject(expression);
   if (IsSelfEvaluating(expression)) {
     next = EvaluateSelfEvaluating;
   } else if (IsVariable(expression)) {
@@ -149,18 +189,20 @@ void EvaluateSelfEvaluating() {
   next = GetContinue();
 }
 void EvaluateVariable() {
-  Object expression = GetExpression();
   b64 found = 0;
-  Object value = LookupVariableValue(expression, GetEnvironment(), &found);
+  LOG("Looking up variable value in environment: ");
+  PrintlnObject(GetExpression());
+  PrintlnObject(GetEnvironment());
+  Object value = LookupVariableValue(GetExpression(), GetEnvironment(), &found);
   if (!found) {
-    LOG_ERROR("Could not find %s in environment", StringCharacterBuffer(expression));
+    LOG_ERROR("Could not find %s in environment", StringCharacterBuffer(GetExpression()));
   }
   SetValue(value);
   next = GetContinue();
 }
 void EvaluateQuoted() {
   Object expression = GetExpression();
-  SetValue(Cdr(expression));
+  SetValue(Second(expression));
   next = GetContinue();
 }
 void EvaluateLambda() {
@@ -197,22 +239,39 @@ void EvaluateApplicationOperands() {
   } else {
     // CASE: 1 or more operands
     Save(REGISTER_PROCEDURE);
-    next = EvaluateOperandLoop;
+    next = EvaluateApplicationOperandLoop;
   }
+}
+
+Object SetLastCdr(Object list, Object last_pair) {
+  if (IsNil(list)) return last_pair;
+  Object head = list;
+
+  for (; IsPair(Cdr(list)); list = Cdr(list))
+    ;
+  SetCdr(list, last_pair);
+  return head;
+}
+
+void AdjoinArgument() {
+  Object last_pair = AllocatePair();
+  SetCar(last_pair, GetValue());
+  Object arguments = SetLastCdr(GetArgumentList(), last_pair);
+  SetArgumentList(arguments);
 }
 
 void EvaluateApplicationAccumulateArgument() {
   Restore(REGISTER_UNEVALUATED);
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_ARGUMENT_LIST);
-  SetArgumentList(AdjoinArgument(GetValue(), GetArgumentList()));
+  AdjoinArgument();
   SetUnevaluated(RestOperands(GetUnevaluated()));
   next = EvaluateApplicationOperandLoop;
 }
 
 void EvaluateApplicationAccumulateLastArgument() {
   Restore(REGISTER_ARGUMENT_LIST);
-  SetArgumentList(AdjoinArgument(GetValue(), GetArgumentList()));
+  AdjoinArgument();
   Restore(REGISTER_PROCEDURE);
   next = EvaluateApplicationDispatch;
 }
@@ -317,6 +376,7 @@ void EvaluateIf() {
   next = EvaluateDispatch;
 }
 
+
 void EvaluateAssignment1() {
   Restore(REGISTER_CONTINUE);
   Restore(REGISTER_ENVIRONMENT);
@@ -343,12 +403,21 @@ void EvaluateAssignment() {
 }
 
 void EvaluateDefinition1() {
+  LOG("Current stack: ");
+  PrintlnObject(GetRegister(REGISTER_STACK));
   Restore(REGISTER_CONTINUE);
+  LOG("Restored continue");
   Restore(REGISTER_ENVIRONMENT);
+  LOG("Restored environment");
   Restore(REGISTER_UNEVALUATED);
+  LOG("Restored unevaluated");
   DefineVariable(REGISTER_UNEVALUATED, REGISTER_VALUE, REGISTER_ENVIRONMENT);
+  LOG("defining variable");
+  PrintlnObject(GetEnvironment());
   // Return the symbol name as the result of the definition.
   SetValue(GetUnevaluated());
+  LOG("Setting the value");
+  PrintlnObject(GetValue());
   next = GetContinue();
 }
 
@@ -356,10 +425,20 @@ void EvaluateDefinition() {
   SetUnevaluated(DefinitionVariable(GetExpression()));
   Save(REGISTER_UNEVALUATED);
 
+  LOG("Setting, then saving Unevaluated:");
+  PrintlnObject(GetUnevaluated());
+
   SetExpression(DefinitionValue(GetExpression()));
+
+  LOG("Setting the expression:");
+  PrintlnObject(GetExpression());
+
   Save(REGISTER_ENVIRONMENT);
   Save(REGISTER_CONTINUE);
   SetContinue(EvaluateDefinition1);
+
+  LOG("Setting continue to %x", EvaluateDefinition1);
+
   next = EvaluateDispatch;
 }
 
@@ -421,4 +500,50 @@ Object MakeProcedure() {
 }
 
 void TestEvaluate() {
+  InitializeMemory(128);
+  InitializeSymbolTable(1);
+  PrintlnObject(Evaluate(BoxFixnum(42)));
+
+  b64 success;
+  ReadObject("'(hello world)", &success);
+  PrintlnObject(GetExpression());
+  PrintlnObject(Evaluate(GetExpression()));
+
+  ReadObject("(define x 42)", &success);
+  PrintlnObject(GetExpression());
+  PrintlnObject(Evaluate(GetExpression()));
+
+  ReadObject("(begin 1 2 3)", &success);
+  PrintlnObject(GetExpression());
+  PrintlnObject(Evaluate(GetExpression()));
+
+  ReadObject("(begin (define x 42) x)", &success);
+  PrintlnObject(GetExpression());
+  PrintlnObject(Evaluate(GetExpression()));
+
+  ReadObject("(fn (x y z) z)", &success);
+  PrintlnObject(GetExpression());
+  PrintlnObject(Evaluate(GetExpression()));
+
+  ReadObject("((fn (x y z) z) 1 2 3)", &success);
+  PrintlnObject(GetExpression());
+  PrintlnObject(Evaluate(GetExpression()));
+
+  ReadObject("((fn () 3))", &success);
+  PrintlnObject(GetExpression());
+  PrintlnObject(Evaluate(GetExpression()));
+
+  ReadObject("(((fn (z) (fn () z)) 3))", &success);
+  PrintlnObject(GetExpression());
+  PrintlnObject(Evaluate(GetExpression()));
+
+  ReadObject("+", &success);
+  PrintlnObject(GetExpression());
+  PrintlnObject(Evaluate(GetExpression()));
+
+  ReadObject("(+ 720 360)", &success);
+  PrintlnObject(GetExpression());
+  PrintlnObject(Evaluate(GetExpression()));
+
+  DestroyMemory();
 }

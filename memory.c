@@ -83,6 +83,7 @@ Object MoveObject(Object object) {
     case TAG_FALSE:
     case TAG_FIXNUM:
     case TAG_REAL32:
+    case TAG_PRIMITIVE_PROCEDURE:
       return MovePrimitive(object);
 
     // Reference Objects
@@ -143,6 +144,7 @@ void PrintObject(Object object) {
     case TAG_FALSE:  printf("#f");  break;
     case TAG_FIXNUM: printf("%lld", UnboxFixnum(object)); break;
     case TAG_REAL32: printf("%ff",  UnboxReal32(object)); break;
+    case TAG_PRIMITIVE_PROCEDURE: printf("<procedure %x>", UnboxPrimitiveProcedure(object)); break;
 
     // Reference Objects
     case TAG_PAIR:               PrintPair(object);              break;
@@ -245,4 +247,5 @@ void TestMemory() {
   SetRegister(REGISTER_EXPRESSION, AllocateVector(30 - NUM_REGISTERS));
   LOG("Root: ");
   PrintlnObject(GetRegister(REGISTER_EXPRESSION));
+  DestroyMemory();
 }
