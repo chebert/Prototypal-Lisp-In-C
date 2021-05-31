@@ -45,20 +45,20 @@ const u8 *ReadObject(const u8 *source, b64 *success) {
 }
 
 Object PopReadStack() {
-  Object top = Car(GetRegister(REGISTER_STACK));
-  SetRegister(REGISTER_STACK, Cdr(GetRegister(REGISTER_STACK)));
+  Object top = Car(GetRegister(REGISTER_READ_STACK));
+  SetRegister(REGISTER_READ_STACK, Cdr(GetRegister(REGISTER_READ_STACK)));
   return top;
 }
 
 void PushReadResultOntoStack() {
   Object read_stack = AllocatePair();
-  SetCdr(read_stack, GetRegister(REGISTER_STACK));
-  SetRegister(REGISTER_STACK, read_stack);
+  SetCdr(read_stack, GetRegister(REGISTER_READ_STACK));
+  SetRegister(REGISTER_READ_STACK, read_stack);
 
   Object pair = AllocatePair();
   SetCar(pair, GetRegister(REGISTER_EXPRESSION));
 
-  SetCar(GetRegister(REGISTER_STACK), pair);
+  SetCar(GetRegister(REGISTER_READ_STACK), pair);
 }
 
 b64 IsErrorToken(const struct Token *token) {
@@ -176,7 +176,7 @@ const u8 *ReadNextListObject(const struct Token *token, const u8 *source, b64 *s
   // stack: (a)
   PushReadResultOntoStack();
   LOG("pushing it onto the read stack: ");
-  PrintlnObject(GetRegister(REGISTER_STACK));
+  PrintlnObject(GetRegister(REGISTER_READ_STACK));
   
   // stack: ((b . nil) (a . nil))
   source = ContinueReadList(source, success);
@@ -190,7 +190,7 @@ const u8 *ReadNextListObject(const struct Token *token, const u8 *source, b64 *s
   // read result: (c . (d . nil))
   Object pair = PopReadStack();
   LOG("popping the read stack: ");
-  PrintlnObject(GetRegister(REGISTER_STACK));
+  PrintlnObject(GetRegister(REGISTER_READ_STACK));
 
   // stack: ((a . nil))
   SetCdr(pair, GetRegister(REGISTER_EXPRESSION));

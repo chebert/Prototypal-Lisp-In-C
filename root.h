@@ -10,6 +10,7 @@ void InitializeRoot();
 
 enum Register {
   REGISTER_SYMBOL_TABLE,
+  REGISTER_READ_STACK,
 
   REGISTER_STACK,
   REGISTER_EXPRESSION,
@@ -18,6 +19,7 @@ enum Register {
   REGISTER_ARGUMENT_LIST,
   REGISTER_PROCEDURE,
   REGISTER_UNEVALUATED,
+  REGISTER_CONTINUE,
   NUM_REGISTERS,
 };
 
@@ -26,5 +28,47 @@ void SetRegister(enum Register reg, Object value);
 
 void Save(enum Register reg);
 void Restore(enum Register reg);
+
+EvaluateFunction GetContinue();
+void SetContinue(EvaluateFunction func);
+
+Object GetValue();
+void SetValue(Object value);
+
+Object GetExpression();
+void SetExpression(Object expression);
+
+Object GetEnvironment();
+void SetEnvironment(Object environment);
+
+Object GetUnevaluated();
+void SetUnevaluated(Object unevaluated);
+
+Object GetProcedure();
+void SetProcedure(Object procedure);
+
+Object GetArgumentList();
+void SetArgumentList(Object arguments);
+
+EvaluateFunction GetContinue();
+void SetContinue(EvaluateFunction func);
+
+Object GetValue();
+void SetValue(Object value);
+
+Object GetExpression();
+void SetExpression(Object expression);
+
+Object GetEnvironment();
+void SetEnvironment(Object environment);
+
+Object GetUnevaluated();
+void SetUnevaluated(Object unevaluated);
+
+Object GetProcedure();
+void SetProcedure(Object procedure);
+
+Object GetArgumentList();
+void SetArgumentList(Object arguments);
 
 #endif

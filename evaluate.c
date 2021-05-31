@@ -23,6 +23,7 @@ b64 IsLambda(Object expression);
 b64 IsSequence(Object expression);
 b64 IsApplication(Object expression);
 
+void EvaluateDispatch();
 void EvaluateSelfEvaluating();
 void EvaluateVariable();
 void EvaluateQuoted();
@@ -33,11 +34,11 @@ void EvaluateLambda();
 void EvaluateBegin();
 void EvaluateSequence();
 void EvaluateApplication();
+void EvaluateApplicationOperands();
 void EvaluateApplicationDispatch();
 void EvaluateUnknown();
 
-static Object MakePair(enum Register car, enum Register cdr);
-static Object MakeProcedure(enum Register environment, enum Register parameters, enum Register body);
+static Object MakeProcedure();
 
 // Environment
 Object LookupVariableValue(Object variable, Object environment, b64 *found);
@@ -75,36 +76,45 @@ Object RestOperands(Object operands);
 b64 IsLastOperand(Object operands);
 
 // Sequence
+Object BeginActions(Object expression);
 Object FirstExpression(Object sequence);
 Object RestExpressions(Object sequence);
 b64 IsLastExpression(Object sequence);
 
-// TODO: make continue register (subvert C call/return)
+EvaluateFunction next;
+
+// Registers
 
 void Evaluate() {
+  next = EvaluateDispatch;
+  while (next)
+    next();
+}
+
+void EvaluateDispatch() {
   // TODO: environment needs
   //   - symbols interned: quote, set!, define, if, fn, ok
-  Object expression = GetRegister(REGISTER_EXPRESSION);
+  Object expression = GetExpression();
   if (IsSelfEvaluating(expression)) {
-    EvaluateSelfEvaluating();
+    next = EvaluateSelfEvaluating;
   } else if (IsVariable(expression)) {
-    EvaluateVariable();
+    next = EvaluateVariable;
   } else if (IsQuoted(expression)) {
-    EvaluateQuoted();
+    next = EvaluateQuoted;
   } else if (IsAssignment(expression)) {
-    EvaluateAssignment();
+    next = EvaluateAssignment;
   } else if (IsDefinition(expression)) {
-    EvaluateDefinition();
+    next = EvaluateDefinition;
   } else if (IsIf(expression)) {
-    EvaluateIf();
+    next = EvaluateIf;
   } else if (IsLambda(expression)) {
-    EvaluateLambda();
+    next = EvaluateLambda;
   } else if (IsSequence(expression)) {
-    EvaluateBegin();
+    next = EvaluateBegin;
   } else if (IsApplication(expression)) {
-    EvaluateApplication();
+    next = EvaluateApplication;
   } else {
-    EvaluateUnknown();
+    next = EvaluateUnknown;
   }
 }
 
@@ -134,187 +144,227 @@ b64 IsLambda(Object expression)      { return IsTaggedList(expression, "fn"); }
 b64 IsApplication(Object expression) { return IsPair(expression); }
 
 void EvaluateSelfEvaluating() {
-  Object expression = GetRegister(REGISTER_EXPRESSION);
-  SetRegister(REGISTER_VALUE, expression);
+  Object expression = GetExpression();
+  SetValue(expression);
+  next = GetContinue();
 }
 void EvaluateVariable() {
-  Object expression = GetRegister(REGISTER_EXPRESSION);
+  Object expression = GetExpression();
   b64 found = 0;
-  Object value = LookupVariableValue(expression, GetRegister(REGISTER_ENVIRONMENT), &found);
+  Object value = LookupVariableValue(expression, GetEnvironment(), &found);
   if (!found) {
     LOG_ERROR("Could not find %s in environment", StringCharacterBuffer(expression));
   }
-  SetRegister(REGISTER_VALUE, value);
+  SetValue(value);
+  next = GetContinue();
 }
 void EvaluateQuoted() {
-  Object expression = GetRegister(REGISTER_EXPRESSION);
-  SetRegister(REGISTER_VALUE, Cdr(expression));
+  Object expression = GetExpression();
+  SetValue(Cdr(expression));
+  next = GetContinue();
 }
 void EvaluateLambda() {
-  Object expression = GetRegister(REGISTER_EXPRESSION);
-  SetRegister(REGISTER_UNEVALUATED, LambdaParameters(expression));
-  SetRegister(REGISTER_EXPRESSION, LambdaBody(expression));
-  SetRegister(REGISTER_VALUE, MakeProcedure(REGISTER_ENVIRONMENT, REGISTER_UNEVALUATED, REGISTER_EXPRESSION));
+  Object expression = GetExpression();
+  SetUnevaluated(LambdaParameters(expression));
+  SetExpression(LambdaBody(expression));
+  SetValue(MakeProcedure());
+  next = GetContinue();
 }
 
 void EvaluateApplication() {
-  Object expression = GetRegister(REGISTER_EXPRESSION);
+  Object expression = GetExpression();
+  Save(REGISTER_CONTINUE);
   Save(REGISTER_ENVIRONMENT);
-  SetRegister(REGISTER_UNEVALUATED, Operands(expression));
+  SetUnevaluated(Operands(expression));
   Save(REGISTER_UNEVALUATED);
   // Evaluate the operator
-  SetRegister(REGISTER_EXPRESSION, Operator(expression));
-  Evaluate();
+  SetExpression(Operator(expression));
+  SetContinue(EvaluateApplicationOperands);
+  next = EvaluateDispatch;
+}
 
+void EvaluateApplicationOperands() {
   // operator has been evaluated.
   Restore(REGISTER_UNEVALUATED);
   Restore(REGISTER_ENVIRONMENT);
 
-  SetRegister(REGISTER_PROCEDURE, GetRegister(REGISTER_VALUE));
-  SetRegister(REGISTER_ARGUMENT_LIST, EmptyArgumentList());
-  if (HasNoOperands(GetRegister(REGISTER_UNEVALUATED))) {
-    EvaluateApplicationDispatch();
-    return;
+  SetProcedure(GetValue());
+  SetArgumentList(EmptyArgumentList());
+
+  if (HasNoOperands(GetUnevaluated())) {
+    // CASE: No operands
+    next = EvaluateApplicationDispatch;
+  } else {
+    // CASE: 1 or more operands
+    Save(REGISTER_PROCEDURE);
+    next = EvaluateOperandLoop;
   }
+}
 
-  Save(REGISTER_PROCEDURE);
+void EvaluateApplicationAccumulateArgument() {
+  Restore(REGISTER_UNEVALUATED);
+  Restore(REGISTER_ENVIRONMENT);
+  Restore(REGISTER_ARGUMENT_LIST);
+  SetArgumentList(AdjoinArgument(GetValue(), GetArgumentList()));
+  SetUnevaluated(RestOperands(GetUnevaluated()));
+  next = EvaluateApplicationOperandLoop;
+}
+
+void EvaluateApplicationAccumulateLastArgument() {
+  Restore(REGISTER_ARGUMENT_LIST);
+  SetArgumentList(AdjoinArgument(GetValue(), GetArgumentList()));
+  Restore(REGISTER_PROCEDURE);
+  next = EvaluateApplicationDispatch;
+}
+
+void EvaluateApplicationLastOperand() {
+  SetContinue(EvaluateApplicationAccumulateLastArgument);
+  next = EvaluateDispatch;
+}
+
+void EvaluateApplicationOperandLoop() {
   // Evaluate operands
-  while (1) {
-    Save(REGISTER_ARGUMENT_LIST);
+  Save(REGISTER_ARGUMENT_LIST);
 
-    SetRegister(REGISTER_EXPRESSION, FirstOperand(GetRegister(REGISTER_UNEVALUATED)));
-    if (IsLastOperand(GetRegister(REGISTER_UNEVALUATED))) {
-      // Evaluate the last argument
-      Evaluate();
+  SetExpression(FirstOperand(GetUnevaluated()));
 
-      Restore(REGISTER_ARGUMENT_LIST);
-      // Add it to the argument list.
-      SetRegister(REGISTER_ARGUMENT_LIST, MakePair(REGISTER_VALUE, REGISTER_ARGUMENT_LIST));
-      // Perform the application
-      EvaluateApplicationDispatch();
-      return;
-    }
-
+  if (IsLastOperand(GetUnevaluated())) {
+    // CASE: 1 argument
+    next = EvaluateApplicationLastOperand;
+  } else {
+    // CASE: 2+ arguments
     Save(REGISTER_ENVIRONMENT);
     Save(REGISTER_UNEVALUATED);
-    // Evaluate the next operand.
-    Evaluate();
-
-    Restore(REGISTER_UNEVALUATED);
-    Restore(REGISTER_ENVIRONMENT);
-
-    Restore(REGISTER_ARGUMENT_LIST);
-
-    // Add the evaluated argument to the argument list.
-    SetRegister(REGISTER_ARGUMENT_LIST, MakePair(REGISTER_VALUE, REGISTER_ARGUMENT_LIST));
-    // Remove the evaluated operand from the unevaluated arguments
-    SetRegister(REGISTER_UNEVALUATED, RestOperands(GetRegister(REGISTER_UNEVALUATED)));
+    SetContinue(EvaluateApplicationAccumulateArgument);
+    next = EvaluateDispatch;
   }
 }
 
 void EvaluateApplicationDispatch() {
-  Object proc = GetRegister(REGISTER_PROCEDURE);
+  Object proc = GetProcedure();
   if (IsPrimitiveProcedure(proc)) {
-    SetRegister(REGISTER_VALUE, ApplyPrimitiveProcedure(proc, GetRegister(REGISTER_ARGUMENT_LIST)));
+    // Primitive-procedure application
+    SetValue(ApplyPrimitiveProcedure(proc, GetArgumentList()));
+    Restore(REGISTER_CONTINUE);
+    next = GetContinue();
   } else if (IsCompoundProcedure(proc)) {
-    Object params = ProcedureParameters(proc);
-    Object environment = ProcedureEnvironment(proc);
-    SetRegister(REGISTER_UNEVALUATED, params);
-    SetRegister(REGISTER_ENVIRONMENT, environment);
+    // Compound-procedure application
+    SetUnevaluated(ProcedureParameters(proc));
+    SetEnvironment(ProcedureEnvironment(proc));
     ExtendEnvironment(REGISTER_UNEVALUATED, REGISTER_ARGUMENT_LIST, REGISTER_ENVIRONMENT);
 
-    SetRegister(REGISTER_UNEVALUATED, ProcedureBody(proc));
-    EvaluateSequence();
+    SetUnevaluated(ProcedureBody(proc));
+    next = EvaluateSequence;
   } else {
     LOG_ERROR("Unknown procedure type");
+    next = NULL;
   }
-}
-
-void EvaluateAssignment() {
-  Object expression = GetRegister(REGISTER_EXPRESSION);
-  SetRegister(REGISTER_UNEVALUATED, AssignmentVariable(expression));
-  Save(REGISTER_UNEVALUATED);
-  SetRegister(REGISTER_EXPRESSION, AssignmentValue(expression));
-  Save(REGISTER_EXPRESSION);
-  Save(REGISTER_ENVIRONMENT);
-  // Evaluate the assignment value
-  Evaluate();
-  Restore(REGISTER_ENVIRONMENT);
-  Restore(REGISTER_EXPRESSION);
-  Restore(REGISTER_UNEVALUATED);
-  SetVariableValue(
-      GetRegister(REGISTER_UNEVALUATED),
-      GetRegister(REGISTER_VALUE),
-      GetRegister(REGISTER_ENVIRONMENT));
-  // Return the symbol 'ok as the result of an assignment
-  SetRegister(REGISTER_VALUE, FindSymbol("ok"));
-}
-
-void EvaluateDefinition() {
-  Object expression = GetRegister(REGISTER_EXPRESSION);
-  SetRegister(REGISTER_UNEVALUATED, DefinitionVariable(expression));
-  Save(REGISTER_UNEVALUATED);
-  SetRegister(REGISTER_EXPRESSION, DefinitionValue(expression));
-  Save(REGISTER_EXPRESSION);
-  Save(REGISTER_ENVIRONMENT);
-  // Evaluate the definition value
-  Evaluate();
-  Restore(REGISTER_ENVIRONMENT);
-  Restore(REGISTER_EXPRESSION);
-  Restore(REGISTER_UNEVALUATED);
-  DefineVariable(REGISTER_UNEVALUATED, REGISTER_VALUE, REGISTER_ENVIRONMENT);
-  // Return the symbol name as the result of the definition.
-  SetRegister(REGISTER_VALUE, GetRegister(REGISTER_UNEVALUATED));
-}
-
-void EvaluateIf() {
-  Object expression = GetRegister(REGISTER_EXPRESSION);
-  Save(REGISTER_EXPRESSION);
-  Save(REGISTER_ENVIRONMENT);
-  SetRegister(REGISTER_EXPRESSION, IfPredicate(GetRegister(REGISTER_EXPRESSION)));
-  // Evaluate the predicate
-  Evaluate();
-  Restore(REGISTER_ENVIRONMENT);
-  Restore(REGISTER_EXPRESSION);
-  if (IsTruthy(GetRegister(REGISTER_VALUE))) {
-    // Consequent
-    SetRegister(REGISTER_EXPRESSION, IfConsequent(GetRegister(REGISTER_EXPRESSION)));
-  } else {
-    // alternative
-    SetRegister(REGISTER_EXPRESSION, IfAlternative(GetRegister(REGISTER_EXPRESSION)));
-  }
-  // Evaluate the consequent/alternative
-  Evaluate();
 }
 
 void EvaluateBegin() {
-  Object expression = GetRegister(REGISTER_EXPRESSION);
-  SetRegister(REGISTER_UNEVALUATED, expression);
-  EvaluateSequence();
+  SetUnevaluated(BeginActions(GetExpression()));
+  Save(REGISTER_CONTINUE);
+  next = EvaluateSequence;
 }
+
+void EvaluateSequenceContinue() {
+  Restore(REGISTER_ENVIRONMENT);
+  Restore(REGISTER_UNEVALUATED);
+
+  SetUnevaluated(RestExpressions(GetUnevaluated()));
+  next = EvaluateSequence;
+}
+void EvaluateSequenceLastExpression() {
+  Restore(REGISTER_CONTINUE);
+  next = EvaluateDispatch;
+}
+
 void EvaluateSequence() {
-  while (1) {
-    Object unevaluated = GetRegister(REGISTER_UNEVALUATED);
-    SetRegister(REGISTER_EXPRESSION, FirstExpression(unevaluated));
-    if (IsLastExpression(unevaluated)) {
-      // Last expression
-      Evaluate();
-      return;
-    }
+  Object unevaluated = GetUnevaluated();
+  SetExpression(FirstExpression(unevaluated));
+
+  if (IsLastExpression(unevaluated)) {
+    // Case: 1 expression left to evaluate
+    next = EvaluateSequenceLastExpression;
+  } else {
+    // Case: 2+ expressions left to evaluate
     Save(REGISTER_UNEVALUATED);
     Save(REGISTER_ENVIRONMENT);
-
-    Evaluate();
-
-    Restore(REGISTER_ENVIRONMENT);
-    Restore(REGISTER_UNEVALUATED);
-
-    SetRegister(REGISTER_UNEVALUATED, RestExpressions(GetRegister(REGISTER_UNEVALUATED)));
+    SetContinue(EvaluateSequenceContinue);
+    next = EvaluateDispatch;
   }
 }
 
+void EvaluateIfDecide() {
+  Restore(REGISTER_CONTINUE);
+  Restore(REGISTER_ENVIRONMENT);
+  Restore(REGISTER_EXPRESSION);
+
+  if (IsTruthy(GetValue())) {
+    SetExpression(IfConsequent(GetExpression()));
+  } else {
+    SetExpression(IfAlternative(GetExpression()));
+  }
+  next = EvaluateDispatch;
+}
+
+void EvaluateIf() {
+  Save(REGISTER_EXPRESSION);
+  Save(REGISTER_ENVIRONMENT);
+  Save(REGISTER_CONTINUE);
+  SetContinue(EvaluateIfDecide);
+  SetExpression(IfPredicate(GetExpression()));
+  next = EvaluateDispatch;
+}
+
+void EvaluateAssignment1() {
+  Restore(REGISTER_CONTINUE);
+  Restore(REGISTER_ENVIRONMENT);
+  Restore(REGISTER_UNEVALUATED);
+
+  SetVariableValue(
+      GetUnevaluated(),
+      GetValue(),
+      GetEnvironment());
+  // Return the symbol 'ok as the result of an assignment
+  SetValue(FindSymbol("ok"));
+  next = GetContinue();
+}
+
+void EvaluateAssignment() {
+  SetUnevaluated(AssignmentVariable(GetExpression()));
+  Save(REGISTER_UNEVALUATED);
+
+  SetExpression(AssignmentValue(GetExpression()));
+  Save(REGISTER_ENVIRONMENT);
+  Save(REGISTER_CONTINUE);
+  SetContinue(EvaluateAssignment1);
+  next = EvaluateDispatch;
+}
+
+void EvaluateDefinition1() {
+  Restore(REGISTER_CONTINUE);
+  Restore(REGISTER_ENVIRONMENT);
+  Restore(REGISTER_UNEVALUATED);
+  DefineVariable(REGISTER_UNEVALUATED, REGISTER_VALUE, REGISTER_ENVIRONMENT);
+  // Return the symbol name as the result of the definition.
+  SetValue(GetUnevaluated());
+  next = GetContinue();
+}
+
+void EvaluateDefinition() {
+  SetUnevaluated(DefinitionVariable(GetExpression()));
+  Save(REGISTER_UNEVALUATED);
+
+  SetExpression(DefinitionValue(GetExpression()));
+  Save(REGISTER_ENVIRONMENT);
+  Save(REGISTER_CONTINUE);
+  SetContinue(EvaluateDefinition1);
+  next = EvaluateDispatch;
+}
+
 void EvaluateUnknown() {
-  PrintlnObject(GetRegister(REGISTER_EXPRESSION));
+  PrintlnObject(GetExpression());
   assert(!"Unknown Expression");
 }
 
@@ -327,69 +377,46 @@ Object ApplyPrimitiveProcedure(Object procedure, Object arguments) {
   return function(arguments);
 }
 
-Object LambdaParameters(Object lambda) {
-  return Second(lambda);
-}
-Object LambdaBody(Object lambda) {
-  return Cdr(Cdr(lambda));
-}
+// Lambda: (lambda (parameters...) . body...)
+Object LambdaParameters(Object lambda) { return Second(lambda); }
+Object LambdaBody(Object lambda)       { return Cdr(Cdr(lambda)); }
 
-// Assignment
-Object AssignmentVariable(Object expression) {
-  return Second(expression);
-}
-Object AssignmentValue(Object expression) {
-  return Third(expression);
-}
+// Assignment: (set! variable value)
+Object AssignmentVariable(Object expression) { return Second(expression); }
+Object AssignmentValue(Object expression)    { return Third(expression); }
 
-// Definition
-Object DefinitionVariable(Object expression) {
-  return Second(expression);
-}
-Object DefinitionValue(Object expression) {
-  return Third(expression);
-}
+// Definition: (define variable value)
+Object DefinitionVariable(Object expression) { return Second(expression); }
+Object DefinitionValue(Object expression)    { return Third(expression); }
 
-// If
-Object IfPredicate(Object expression) {
-  return Second(expression);
-}
-Object IfConsequent(Object expression) {
-  return Third(expression);
-}
-Object IfAlternative(Object expression) {
-  return Fourth(expression);
-}
-b64 IsTruthy(Object condition) {
-  return !IsFalse(condition);
-}
+// If: (if condition consequent alternative)
+Object IfPredicate(Object expression)   { return Second(expression); }
+Object IfConsequent(Object expression)  { return Third(expression); }
+Object IfAlternative(Object expression) { return Fourth(expression); }
+b64    IsTruthy(Object condition)       { return !IsFalse(condition); }
 
-// Application
+// Application: (operator . operands...)
 Object Operator(Object application) { return Car(application); }
 Object Operands(Object application) { return Cdr(application); }
 
-b64 HasNoOperands(Object operands) { return operands == nil; }
-Object EmptyArgumentList() { return nil; }
-Object FirstOperand(Object operands) { return Car(operands); }
-Object RestOperands(Object operands) { return Cdr(operands); }
-b64 IsLastOperand(Object operands) { return HasNoOperands(RestOperands(operands)); }
+// Operands: (operands...)
+Object EmptyArgumentList()            { return nil; }
+Object FirstOperand(Object operands)  { return Car(operands); }
+Object RestOperands(Object operands)  { return Cdr(operands); }
+b64    HasNoOperands(Object operands) { return IsNil(operands); }
+b64    IsLastOperand(Object operands) { return HasNoOperands(RestOperands(operands)); }
 
-// Sequence
-Object FirstExpression(Object sequence) { return First(sequence); }
-Object RestExpressions(Object sequence) { return Rest(sequence); }
-b64 IsLastExpression(Object sequence) { return Rest(sequence) == nil; }
+// Sequence: (expressions...)
+Object BeginActions(Object expression)   { return Rest(expression); }
+Object FirstExpression(Object sequence)  { return First(sequence); }
+Object RestExpressions(Object sequence)  { return Rest(sequence); }
+b64    IsLastExpression(Object sequence) { return Rest(sequence) == nil; }
 
-Object MakePair(enum Register car, enum Register cdr) {
-  Object pair = AllocatePair();
-  SetCar(pair, GetRegister(car));
-  SetCdr(pair, GetRegister(cdr));
-  return pair;
-}
-Object MakeProcedure(enum Register environment, enum Register parameters, enum Register body) {
+Object MakeProcedure() {
   Object procedure = AllocateCompoundProcedure();
-  SetProcedureEnvironment(procedure, GetRegister(environment));
-  SetProcedureParameters(procedure, GetRegister(parameters));
-  SetProcedureBody(procedure, GetRegister(body));
+  SetProcedureEnvironment(procedure, GetEnvironment());
+  SetProcedureParameters(procedure, GetUnevaluated());
+  SetProcedureBody(procedure, GetExpression());
   return procedure;
 }
 

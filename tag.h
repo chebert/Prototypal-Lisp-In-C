@@ -17,6 +17,8 @@
 // Objects are u64 so that we can easily perform bit manipulations.
 typedef u64      Object;
 
+typedef Object (*PrimitiveFunction)(Object arguments);
+typedef void (*EvaluateFunction)();
 
 // Type Tags for Objects
 enum Tag {
@@ -28,7 +30,8 @@ enum Tag {
   // Primitive Types
   TAG_FIXNUM, // Fixnum is a 47-bit signed integer
   TAG_REAL32, // 32-bit float
-  TAG_PRIMITIVE_PROCEDURE, // An object holding a C function pointer.
+  TAG_PRIMITIVE_PROCEDURE, // An object holding a PrimitiveFunction
+  TAG_EVALUATE_FUNCTION = TAG_PRIMITIVE_PROCEDURE, // An object holding an EvaluateFunction
 
   // Reference Types (Payloads are indices into memory vectors)
   TAG_PAIR, // Pair consists of two Objects
@@ -68,9 +71,8 @@ b64 IsByteVector(Object object);
 b64 IsString(Object object);
 b64 IsSymbol(Object object);
 b64 IsPrimitiveProcedure(Object object);
+b64 IsEvaluateFunction(Object object);
 b64 IsCompoundProcedure(Object object);
-
-typedef Object (*PrimitiveFunction)(Object arguments);
 
 // Construct boxed values given native C types
 Object BoxFixnum(s64 fixnum); // Truncates to 47 bits
@@ -78,6 +80,7 @@ Object BoxBoolean(b64 boolean);
 Object BoxReal32(real32 value);
 Object BoxReal64(real64 value);
 Object BoxPrimitiveProcedure(PrimitiveFunction proc);
+Object BoxEvaluateFunction(EvaluateFunction func);
 // Construct referential data structures. References are indices.
 Object BoxPair(u64 reference);
 Object BoxVector(u64 reference);
@@ -98,7 +101,8 @@ s64    UnboxFixnum(Object object);
 b64    UnboxBoolean(Object object);
 real32 UnboxReal32(Object object);
 real64 UnboxReal64(Object object);
-PrimitiveFunction UnboxPrimitiveProcedure(u64 reference);
+PrimitiveFunction UnboxPrimitiveProcedure(Object object);
+EvaluateFunction UnboxEvaluateFunction(Object object);
 // Unbox Pair, Vector, Byte Vector, String, Symbol
 u64 UnboxReference(Object object);
 // Unbox GC Types

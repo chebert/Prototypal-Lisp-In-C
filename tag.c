@@ -106,6 +106,7 @@ b64 IsString(Object object)             { return HasTag(object, TAG_STRING); }
 b64 IsSymbol(Object object)             { return HasTag(object, TAG_SYMBOL); }
 b64 IsCompoundProcedure(Object object)  { return HasTag(object, TAG_COMPOUND_PROCEDURE); }
 b64 IsPrimitiveProcedure(Object object) { return HasTag(object, TAG_PRIMITIVE_PROCEDURE); }
+b64 IsEvaluateFunction(Object object)   { return HasTag(object, TAG_EVALUATE_FUNCTION); }
 
 Object TagPayload(u64 payload, enum Tag tag) {
   return TAGGED_OBJECT_MASK | SHIFT_LEFT(tag, TAG_SHIFT) | payload;
@@ -135,6 +136,9 @@ Object BoxPrimitiveProcedure(PrimitiveFunction function) {
   assert(address < SHIFT_LEFT(1, TAG_SHIFT));
   return TagPayload(address, TAG_PRIMITIVE_PROCEDURE);
 }
+Object BoxEvaluateFunction(EvaluateFunction function) {
+  return BoxPrimitiveProcedure((PrimitiveFunction)function);
+}
 
 s64 UnboxFixnum(Object object) {
   u64 sign_bit_mask = SHIFT_LEFT(1, TAG_SHIFT-1); 
@@ -153,6 +157,9 @@ u64    UnboxReference(Object object)  { return (PAYLOAD_MASK & object); }
 u64    UnboxBlobHeader(Object object) { return (PAYLOAD_MASK & object); }
 PrimitiveFunction UnboxPrimitiveProcedure(Object object) {
   return (PrimitiveFunction)(PAYLOAD_MASK & object);
+}
+EvaluateFunction UnboxEvaluateFunction(Object object) {
+  return (EvaluateFunction)(PAYLOAD_MASK & object);
 }
 
 // Just for testing.
