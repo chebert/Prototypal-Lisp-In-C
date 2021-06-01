@@ -8,7 +8,7 @@
 // It is implemented as a Blob.
 
 // Allocate and access a vector of 8-bit bytes.
-Object AllocateByteVector(u64 num_bytes);
+Object AllocateByteVector(u64 num_bytes, enum ErrorCode *error);
 Object MoveByteVector(Object byte_vector);
 
 // Returns the number of bytes in byte_vector.

@@ -10,8 +10,10 @@ Object MoveSymbol(Object symbol) {
   return BoxSymbol(MoveBlob(UnboxReference(symbol)));
 }
 
-Object AllocateSymbol(const char *name) {
-  return BoxSymbol(AllocateString(name));
+Object AllocateSymbol(const char *name, enum ErrorCode *error) {
+  Object symbol = AllocateString(name, error);
+  if (IsNil(symbol)) return nil;
+  return BoxSymbol(symbol);
 }
 
 void PrintSymbol(Object symbol) {

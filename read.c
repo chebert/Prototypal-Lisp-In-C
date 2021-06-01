@@ -121,8 +121,12 @@ Object ProcessSingleToken(const struct Token *token, enum ErrorCode *error) {
     sscanf(data, "%lf", &value);
     object = BoxReal64(value);
   } else if (token->type == TOKEN_STRING) {
-    object = AllocateString(data);
+    object = AllocateString(data, error);
     // REFERENCES INVALIDATED
+    if (*error) {
+      free(data);
+      return nil;
+    }
   } else if (token->type == TOKEN_SYMBOL) {
     object = InternSymbol(data, error);
     // REFERENCES INVALIDATED

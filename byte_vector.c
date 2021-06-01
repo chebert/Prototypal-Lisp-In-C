@@ -7,8 +7,10 @@
 #include "blob.h"
 #include "memory.h"
 
-Object AllocateByteVector(u64 num_bytes) {
-  u64 new_reference = AllocateBlob(num_bytes);
+Object AllocateByteVector(u64 num_bytes, enum ErrorCode *error) {
+  u64 new_reference = AllocateBlob(num_bytes, error);
+  if (*error) return nil;
+
   memset(&memory.the_objects[new_reference + 1], 0, num_bytes);
   return BoxByteVector(new_reference);
 }

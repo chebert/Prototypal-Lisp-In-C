@@ -82,7 +82,8 @@ Object InternNewSymbol(u64 index, const u8 *name, enum ErrorCode *error) {
   UnsafeVectorSet(GetSymbolTable(), index, new_symbols);
 
   SetCdr(new_symbols, old_symbols);
-  SetCar(new_symbols, AllocateSymbol(name));
+  SetCar(new_symbols, AllocateSymbol(name, error));
+  if (*error) return nil;
   // REFERENCES INVALIDATED
 
   // Return the new symbol.

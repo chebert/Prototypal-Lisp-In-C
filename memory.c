@@ -217,15 +217,15 @@ static Object MakePair(Object car, Object cdr) {
 void TestMemory() {
   InitializeMemory(32);
   MakePair(BoxFixnum(4), BoxFixnum(2));
-  Object string = AllocateString("Hello");
-
   enum ErrorCode error;
-  Object vector = AllocateVector(3, &error);
-  VectorSet(vector, 0, AllocateString("Zero"), &error);
-  VectorSet(vector, 1, AllocateString("One"), &error);
-  VectorSet(vector, 2, AllocateString("Two"), &error);
+  Object string = AllocateString("Hello", &error);
 
-  Object byte_vector = AllocateByteVector(4);
+  Object vector = AllocateVector(3, &error);
+  VectorSet(vector, 0, AllocateString("Zero", &error), &error);
+  VectorSet(vector, 1, AllocateString("One", &error), &error);
+  VectorSet(vector, 2, AllocateString("Two", &error), &error);
+
+  Object byte_vector = AllocateByteVector(4, &error);
   ByteVectorSet(byte_vector, 0, 0xc, &error);
   ByteVectorSet(byte_vector, 1, 0xa, &error);
   ByteVectorSet(byte_vector, 2, 0xf, &error);
