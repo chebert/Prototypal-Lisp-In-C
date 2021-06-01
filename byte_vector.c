@@ -28,6 +28,7 @@ s64 ByteVectorLength(Object byte_vector, enum ErrorCode *error) {
     return 0;
   }
 
+  *error = NO_ERROR;
   return UnboxFixnum(memory.the_objects[UnboxReference(byte_vector)]);
 }
 
@@ -49,26 +50,24 @@ Object ByteVectorRef(Object byte_vector, u64 index, enum ErrorCode *error) {
   if (!IsByteVector(byte_vector)) {
     *error = ERROR_BYTE_VECTOR_REFERENCE_NON_BYTE_VECTOR;
     return nil;
-  }
-  if (index >= UnsafeByteVectorLength(byte_vector)) {
+  } else if (index >= UnsafeByteVectorLength(byte_vector)) {
     *error = ERROR_BYTE_VECTOR_REFERENCE_INDEX_OUT_OF_RANGE;
     return nil;
+  } else {
+    *error = NO_ERROR;
+    return UnsafeByteVectorRef(byte_vector, index);
   }
-  *error = NO_ERROR;
-  return UnsafeByteVectorRef(byte_vector, index);
 }
 
 void ByteVectorSet(Object byte_vector, u64 index, u8 value, enum ErrorCode *error) {
   if (!IsByteVector(byte_vector)) {
     *error = ERROR_BYTE_VECTOR_SET_NON_BYTE_VECTOR;
-    return;
-  }
-  if (index >= UnsafeByteVectorLength(byte_vector)) {
+  } else if (index >= UnsafeByteVectorLength(byte_vector)) {
     *error = ERROR_BYTE_VECTOR_SET_INDEX_OUT_OF_RANGE;
-    return;
+  } else {
+    *error = NO_ERROR;
+    UnsafeByteVectorSet(byte_vector, index, value);
   }
-  *error = NO_ERROR;
-  UnsafeByteVectorSet(byte_vector, index, value);
 }
 
 void PrintByteVector(Object object) {

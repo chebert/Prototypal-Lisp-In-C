@@ -1,5 +1,7 @@
 #include "evaluate.h"
 
+#include <assert.h>
+
 #include "compound_procedure.h"
 #include "environment.h"
 #include "log.h"
@@ -81,7 +83,7 @@ Object IfAlternative(Object expression);
 b64 IsTruthy(Object condition);
 
 // Application
-void AdjoinArgument();
+enum ErrorCode AdjoinArgument();
 
 Object Operands(Object application);
 Object Operator(Object application);
@@ -96,6 +98,15 @@ Object BeginActions(Object expression);
 Object FirstExpression(Object sequence);
 Object RestExpressions(Object sequence);
 b64 IsLastExpression(Object sequence);
+
+#define SAVE(reg, error) \
+  do { \
+    Save(reg, &error); \
+    if (error) { \
+      next = EvaluateError; \
+      return; \
+    } \
+  } while(0);
 
 static EvaluateFunction next;
 
@@ -129,7 +140,9 @@ PrimitiveFunction primitives[] = {
 #define NUM_PRIMITIVES (sizeof(primitives) / sizeof(primitives[0]))
 
 void DefinePrimitive(const u8 *name, PrimitiveFunction function) {
-  SetUnevaluated(InternSymbol(name));
+  enum ErrorCode error;
+  SetUnevaluated(InternSymbol(name, &error));
+  assert(!error);
   SetValue(BoxPrimitiveProcedure(function));
   DefineVariable(REGISTER_UNEVALUATED, REGISTER_VALUE, REGISTER_ENVIRONMENT);
 }
@@ -143,13 +156,14 @@ Object Evaluate(Object expression) {
 
   // Ensure that the evaluator can find all the necessary symbols.
   // to avoid allocating during EvaluateDispatch.
-  InternSymbol("quote");
-  InternSymbol("set!");
-  InternSymbol("define");
-  InternSymbol("if");
-  InternSymbol("fn");
-  InternSymbol("begin");
-  InternSymbol("ok");
+  enum ErrorCode error;
+  InternSymbol("quote", &error);
+  InternSymbol("set!", &error);
+  InternSymbol("define", &error);
+  InternSymbol("if", &error);
+  InternSymbol("fn", &error);
+  InternSymbol("begin", &error);
+  InternSymbol("ok", &error);
 
   // Create the initial environment
   MakeInitialEnvironment();
@@ -264,10 +278,11 @@ void EvaluateLambda() {
 void EvaluateApplication() {
   LOG("Application");
   Object expression = GetExpression();
-  Save(REGISTER_CONTINUE);
-  Save(REGISTER_ENVIRONMENT);
+  enum ErrorCode error;
+  SAVE(REGISTER_CONTINUE, error);
+  SAVE(REGISTER_ENVIRONMENT, error);
   SetUnevaluated(Operands(expression));
-  Save(REGISTER_UNEVALUATED);
+  SAVE(REGISTER_UNEVALUATED, error);
   // Evaluate the operator
   LOG("Evaluating operator");
   SetExpression(Operator(expression));
@@ -290,7 +305,8 @@ void EvaluateApplicationOperands() {
     next = EvaluateApplicationDispatch;
   } else {
     // CASE: 1 or more operands
-    Save(REGISTER_PROCEDURE);
+    enum ErrorCode error;
+    SAVE(REGISTER_PROCEDURE, error);
     next = EvaluateApplicationOperandLoop;
   }
 }
@@ -306,11 +322,17 @@ Object SetLastCdr(Object list, Object last_pair) {
   return head;
 }
 
-void AdjoinArgument() {
-  Object last_pair = AllocatePair();
-  SetCar(last_pair, GetValue());
+enum ErrorCode AdjoinArgument() {
+  enum ErrorCode error;
+  Object last_pair = AllocatePair(&error);
+  if (error) {
+    LOG_ERROR("Could not allocate pair for new argument");
+    return error;
+  }
 
+  SetCar(last_pair, GetValue());
   SetArgumentList(SetLastCdr(GetArgumentList(), last_pair));
+  return error;
 }
 
 void EvaluateApplicationAccumulateArgument() {
@@ -318,17 +340,27 @@ void EvaluateApplicationAccumulateArgument() {
   Restore(REGISTER_UNEVALUATED);
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_ARGUMENT_LIST);
-  AdjoinArgument();
-  SetUnevaluated(RestOperands(GetUnevaluated()));
-  next = EvaluateApplicationOperandLoop;
+  enum ErrorCode error = AdjoinArgument();
+  if (error) {
+    LOG_ERROR("Could not adjoin argument");
+    next = EvaluateError;
+  } else {
+    SetUnevaluated(RestOperands(GetUnevaluated()));
+    next = EvaluateApplicationOperandLoop;
+  }
 }
 
 void EvaluateApplicationAccumulateLastArgument() {
   LOG("Accumulating last argument");
   Restore(REGISTER_ARGUMENT_LIST);
-  AdjoinArgument();
-  Restore(REGISTER_PROCEDURE);
-  next = EvaluateApplicationDispatch;
+  enum ErrorCode error = AdjoinArgument();
+  if (error) {
+    LOG_ERROR("Could not adjoin argument");
+    next = EvaluateError;
+  } else {
+    Restore(REGISTER_PROCEDURE);
+    next = EvaluateApplicationDispatch;
+  }
 }
 
 void EvaluateApplicationLastOperand() {
@@ -340,7 +372,8 @@ void EvaluateApplicationLastOperand() {
 void EvaluateApplicationOperandLoop() {
   LOG("Evaluating next operand");
   // Evaluate operands
-  Save(REGISTER_ARGUMENT_LIST);
+  enum ErrorCode error;
+  SAVE(REGISTER_ARGUMENT_LIST, error);
 
   SetExpression(FirstOperand(GetUnevaluated()));
 
@@ -350,8 +383,8 @@ void EvaluateApplicationOperandLoop() {
   } else {
     // CASE: 2+ arguments
     LOG("not the last operand");
-    Save(REGISTER_ENVIRONMENT);
-    Save(REGISTER_UNEVALUATED);
+    SAVE(REGISTER_ENVIRONMENT, error);
+    SAVE(REGISTER_UNEVALUATED, error);
     SetContinue(EvaluateApplicationAccumulateArgument);
     next = EvaluateDispatch;
   }
@@ -384,7 +417,8 @@ void EvaluateApplicationDispatch() {
 void EvaluateBegin() {
   LOG("Evaluate begin");
   SetUnevaluated(BeginActions(GetExpression()));
-  Save(REGISTER_CONTINUE);
+  enum ErrorCode error;
+  SAVE(REGISTER_CONTINUE, error);
   next = EvaluateSequence;
 }
 
@@ -413,8 +447,9 @@ void EvaluateSequence() {
     next = EvaluateSequenceLastExpression;
   } else {
     // Case: 2+ expressions left to evaluate
-    Save(REGISTER_UNEVALUATED);
-    Save(REGISTER_ENVIRONMENT);
+    enum ErrorCode error;
+    SAVE(REGISTER_UNEVALUATED, error);
+    SAVE(REGISTER_ENVIRONMENT, error);
     SetContinue(EvaluateSequenceContinue);
     next = EvaluateDispatch;
   }
@@ -436,9 +471,10 @@ void EvaluateIfDecide() {
 
 void EvaluateIf() {
   LOG("Evaluate if");
-  Save(REGISTER_EXPRESSION);
-  Save(REGISTER_ENVIRONMENT);
-  Save(REGISTER_CONTINUE);
+  enum ErrorCode error;
+  SAVE(REGISTER_EXPRESSION, error);
+  SAVE(REGISTER_ENVIRONMENT, error);
+  SAVE(REGISTER_CONTINUE, error);
   SetContinue(EvaluateIfDecide);
   SetExpression(IfPredicate(GetExpression()));
   next = EvaluateDispatch;
@@ -463,11 +499,12 @@ void EvaluateAssignment1() {
 void EvaluateAssignment() {
   LOG("Evaluate assignment");
   SetUnevaluated(AssignmentVariable(GetExpression()));
-  Save(REGISTER_UNEVALUATED);
+  enum ErrorCode error;
+  SAVE(REGISTER_UNEVALUATED, error);
 
   SetExpression(AssignmentValue(GetExpression()));
-  Save(REGISTER_ENVIRONMENT);
-  Save(REGISTER_CONTINUE);
+  SAVE(REGISTER_ENVIRONMENT, error);
+  SAVE(REGISTER_CONTINUE, error);
   SetContinue(EvaluateAssignment1);
   next = EvaluateDispatch;
 }
@@ -493,7 +530,8 @@ void EvaluateDefinition1() {
 
 void EvaluateDefinition() {
   SetUnevaluated(DefinitionVariable(GetExpression()));
-  Save(REGISTER_UNEVALUATED);
+  enum ErrorCode error;
+  SAVE(REGISTER_UNEVALUATED, error);
 
   LOG("Setting, then saving Unevaluated:");
   PrintlnObject(GetUnevaluated());
@@ -503,8 +541,8 @@ void EvaluateDefinition() {
   LOG("Setting the expression:");
   PrintlnObject(GetExpression());
 
-  Save(REGISTER_ENVIRONMENT);
-  Save(REGISTER_CONTINUE);
+  SAVE(REGISTER_ENVIRONMENT, error);
+  SAVE(REGISTER_CONTINUE, error);
   SetContinue(EvaluateDefinition1);
 
   LOG("Setting continue to %x", EvaluateDefinition1);
@@ -581,50 +619,51 @@ Object MakeProcedure() {
 void TestEvaluate() {
   InitializeMemory(128);
   InitializeSymbolTable(1);
+
   PrintlnObject(Evaluate(BoxFixnum(42)));
 
-  b64 success;
-  ReadObject("'(hello world)", &success);
+  enum ErrorCode error;
+  ReadObject("'(hello world)", &error);
   PrintlnObject(GetExpression());
   PrintlnObject(Evaluate(GetExpression()));
 
-  ReadObject("(define x 42)", &success);
+  ReadObject("(define x 42)", &error);
   PrintlnObject(GetExpression());
   PrintlnObject(Evaluate(GetExpression()));
 
-  ReadObject("(begin 1 2 3)", &success);
+  ReadObject("(begin 1 2 3)", &error);
   PrintlnObject(GetExpression());
   PrintlnObject(Evaluate(GetExpression()));
 
-  ReadObject("(begin (define x 42) x)", &success);
+  ReadObject("(begin (define x 42) x)", &error);
   PrintlnObject(GetExpression());
   PrintlnObject(Evaluate(GetExpression()));
 
-  ReadObject("(fn (x y z) z)", &success);
+  ReadObject("(fn (x y z) z)", &error);
   PrintlnObject(GetExpression());
   PrintlnObject(Evaluate(GetExpression()));
 
-  ReadObject("((fn (x y z) z) 1 2 3)", &success);
+  ReadObject("((fn (x y z) z) 1 2 3)", &error);
   PrintlnObject(GetExpression());
   PrintlnObject(Evaluate(GetExpression()));
 
-  ReadObject("((fn () 3))", &success);
+  ReadObject("((fn () 3))", &error);
   PrintlnObject(GetExpression());
   PrintlnObject(Evaluate(GetExpression()));
 
-  ReadObject("(((fn (z) (fn () z)) 3))", &success);
+  ReadObject("(((fn (z) (fn () z)) 3))", &error);
   PrintlnObject(GetExpression());
   PrintlnObject(Evaluate(GetExpression()));
 
-  ReadObject("+", &success);
+  ReadObject("+", &error);
   PrintlnObject(GetExpression());
   PrintlnObject(Evaluate(GetExpression()));
 
-  ReadObject("(+ 720 360)", &success);
+  ReadObject("(+ 720 360)", &error);
   PrintlnObject(GetExpression());
   PrintlnObject(Evaluate(GetExpression()));
 
-  ReadObject("(- (+ 720 360) 14)", &success);
+  ReadObject("(- (+ 720 360) 14)", &error);
   PrintlnObject(GetExpression());
   PrintlnObject(Evaluate(GetExpression()));
 

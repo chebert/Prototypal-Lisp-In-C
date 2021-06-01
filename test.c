@@ -6,13 +6,11 @@
 #include "symbol_table.h"
 
 int main(int argc, char **argv) {
-  /*
   TestTag();
   TestToken();
   TestMemory();
   TestSymbolTable();
   TestRead();
-  */
   TestEvaluate();
   return 0;
 }

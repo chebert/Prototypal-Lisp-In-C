@@ -1,6 +1,7 @@
 #ifndef SYMBOL_TABLE_H
 #define SYMBOL_TABLE_H
 
+#include "error.h"
 #include "tag.h"
 
 // The Symbol Table is a Hashed set of Symbol Objects.
@@ -15,7 +16,7 @@ u32 HashString(const u8 *str);
 Object MakeSymbolTable(u64 size);
 
 Object FindSymbol(const u8 *name);
-Object InternSymbol(const u8 *name);
+Object InternSymbol(const u8 *name, enum ErrorCode *error);
 void UninternSymbol(const u8 *name);
 
 void TestSymbolTable();

@@ -7,10 +7,10 @@
 #include "log.h"
 #include "memory.h"
 
-Object AllocateVector(u64 num_objects) {
-  enum ErrorCode error = EnsureEnoughMemory(num_objects + 1);
-  if (!error) {
-    // TODO:
+Object AllocateVector(u64 num_objects, enum ErrorCode *error) {
+  *error = EnsureEnoughMemory(num_objects + 1);
+  if (*error) {
+    LOG_ERROR("Not enough memory to allocate vector of size %llu. %s", num_objects);
     return nil;
   }
   // [ ..., free.. ]
@@ -79,6 +79,7 @@ s64 VectorLength(Object vector, enum ErrorCode *error) {
     *error = ERROR_VECTOR_LENGTH_NON_VECTOR;
     return 0;
   }
+  *error = NO_ERROR;
   return UnboxFixnum(memory.the_objects[UnboxReference(vector)]);
 }
 Object VectorRef(Object vector, u64 index, enum ErrorCode *error) {
@@ -90,6 +91,7 @@ Object VectorRef(Object vector, u64 index, enum ErrorCode *error) {
     *error = ERROR_VECTOR_REFERENCE_INDEX_OUT_OF_RANGE;
     return nil;
   }
+  *error = NO_ERROR;
   return memory.the_objects[UnboxReference(vector)+1 + index];
 }
 
@@ -102,6 +104,7 @@ void VectorSet(Object vector, u64 index, Object value, enum ErrorCode *error) {
     *error = ERROR_VECTOR_SET_INDEX_OUT_OF_RANGE;
     return;
   }
+  *error = NO_ERROR;
   memory.the_objects[UnboxReference(vector)+1 + index] = value;
 }
 

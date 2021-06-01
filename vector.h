@@ -8,7 +8,7 @@
 // Memory Layout: [ ..., N, Object0, Object1, .., ObjectN, ...]
 
 // Allocate and access a vector of objects.
-Object AllocateVector(u64 num_objects);
+Object AllocateVector(u64 num_objects, enum ErrorCode *error);
 
 Object MoveVector(Object vector);
 

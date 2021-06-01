@@ -7,10 +7,10 @@
 #include "memory.h"
 #include "root.h"
 
-Object AllocatePair() {
-  enum ErrorCode error = EnsureEnoughMemory(2);
-  if (!error) {
-    // TODO:
+Object AllocatePair(enum ErrorCode *error) {
+  *error = EnsureEnoughMemory(2);
+  if (*error) {
+    LOG_ERROR("Not enough memory to allocate pair");
     return nil;
   }
 

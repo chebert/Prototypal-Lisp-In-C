@@ -1,6 +1,7 @@
 #ifndef PAIR_H
 #define PAIR_H
 
+#include "error.h"
 #include "tag.h"
 
 // A pair is a compound type representing 2 associated Objects.
@@ -9,7 +10,7 @@
 // A pair Object is a reference to this pair.
 
 // Allocate a pair of 2 objects.
-Object AllocatePair();
+Object AllocatePair(enum ErrorCode *error);
 // Move a pair from the_objects to new_objects
 Object MovePair(Object pair);
 

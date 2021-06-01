@@ -1,12 +1,16 @@
 #include "root.h"
 
+#include <assert.h>
+
 #include "memory.h"
 #include "pair.h"
 #include "symbol_table.h"
 #include "vector.h"
 
 void InitializeRoot() {
-  memory.root = AllocateVector(NUM_REGISTERS);
+  enum ErrorCode error;
+  memory.root = AllocateVector(NUM_REGISTERS, &error);
+  assert(!error);
 }
 
 Object GetRegister(enum Register reg) {
@@ -17,8 +21,9 @@ void SetRegister(enum Register reg, Object value) {
   UnsafeVectorSet(memory.root, reg, value); 
 }
 
-void Save(enum Register reg) {
-  Object stack = AllocatePair();
+void Save(enum Register reg, enum ErrorCode *error) {
+  Object stack = AllocatePair(error);
+  if (*error) return;
   SetCar(stack, GetRegister(reg));
   SetCdr(stack, GetRegister(REGISTER_STACK));
   SetRegister(REGISTER_STACK, stack);

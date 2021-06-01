@@ -16,32 +16,31 @@
 // Pops the top of the Read stack
 Object PopReadStack();
 // Pushes the (read_result . nil) onto the top of the read stack. TODO: can we just push read_result?
-void PushReadResultOntoStack();
+enum ErrorCode PushReadResultOntoStack();
 // Reads the next Object from token, and then source.
-const u8 *ReadNextObjectFromToken(const struct Token *token, const u8 *source, b64 *success);
+const u8 *ReadNextObjectFromToken(const struct Token *token, const u8 *source, enum ErrorCode *error);
 
 // True if the token is a single token (i.e. not a list token or an error)
 b64 IsSingleToken(const struct Token *token);
 // Construct & return Object given a single token.
-Object ProcessSingleToken(const struct Token *token, b64 *success);
+Object ProcessSingleToken(const struct Token *token, enum ErrorCode *error);
 
 // True if the token is an error (like EOF or an unterminated string).
 b64 IsErrorToken(const struct Token *token);
-// Prints an error message and sets success to false.
-void HandleErrorToken(const struct Token *token, b64 *success);
+// Prints an error message and sets error.
+void HandleErrorToken(const struct Token *token, enum ErrorCode *error);
 
 // Reads the next Object from source, leaving the resulting object in REGISTER_EXPRESSION.
 // Returns the remaining unconsumed source.
-// success is marked as true upon reading the full object.
-const u8 *ReadNextObject(const u8 *source, b64 *success);
+const u8 *ReadNextObject(const u8 *source, enum ErrorCode *error);
 // Function to begin reading a list.
-const u8 *BeginReadList(const u8 *source, b64 *success);
+const u8 *BeginReadList(const u8 *source, enum ErrorCode *error);
 // Functions to continue reading a list.
-const u8 *ContinueReadList(const u8 *source, b64 *success);
-const u8 *ReadNextListObject(const struct Token *token, const u8 *source, b64 *success);
+const u8 *ContinueReadList(const u8 *source, enum ErrorCode *error);
+const u8 *ReadNextListObject(const struct Token *token, const u8 *source, enum ErrorCode *error);
 
-const u8 *ReadObject(const u8 *source, b64 *success) {
-  return ReadNextObject(source, success);
+const u8 *ReadObject(const u8 *source, enum ErrorCode *error) {
+  return ReadNextObject(source, error);
 }
 
 Object PopReadStack() {
@@ -50,15 +49,27 @@ Object PopReadStack() {
   return top;
 }
 
-void PushReadResultOntoStack() {
-  Object read_stack = AllocatePair();
+enum ErrorCode PushReadResultOntoStack() {
+  enum ErrorCode error;
+  Object read_stack = AllocatePair(&error);
+  if (error) {
+    LOG_ERROR("Could not allocate pair");
+    return error;
+  }
+
   SetCdr(read_stack, GetRegister(REGISTER_READ_STACK));
   SetRegister(REGISTER_READ_STACK, read_stack);
 
-  Object pair = AllocatePair();
-  SetCar(pair, GetRegister(REGISTER_EXPRESSION));
+  Object pair = AllocatePair(&error);
+  if (error) {
+    LOG_ERROR("Could not allocate pair");
+    return error;
+  }
 
+  SetCar(pair, GetRegister(REGISTER_EXPRESSION));
   SetCar(GetRegister(REGISTER_READ_STACK), pair);
+
+  return error;
 }
 
 b64 IsErrorToken(const struct Token *token) {
@@ -71,13 +82,13 @@ b64 IsErrorToken(const struct Token *token) {
   }
 }
 
-void HandleErrorToken(const struct Token *token, b64 *success) {
+void HandleErrorToken(const struct Token *token, enum ErrorCode *error) {
   if (token->type == TOKEN_UNTERMINATED_STRING) {
     LOG_ERROR("Unterminated string inside of list\n");
-    *success = 0;
+    *error = ERROR_READ_UNTERMINATED_STRING;
   } else if (token->type == TOKEN_EOF) {
     LOG_ERROR("Unterminated list\n");
-    *success = 0;
+    *error = ERROR_READ_UNTERMINATED_LIST;
   }
 }
 
@@ -94,7 +105,7 @@ b64 IsSingleToken(const struct Token *token) {
   }
 }
 
-Object ProcessSingleToken(const struct Token *token, b64 *success) {
+Object ProcessSingleToken(const struct Token *token, enum ErrorCode *error) {
   u8 *data = CopyTokenSource(token);
   Object object = nil;
   if (token->type == TOKEN_INTEGER) {
@@ -113,74 +124,87 @@ Object ProcessSingleToken(const struct Token *token, b64 *success) {
     object = AllocateString(data);
     // REFERENCES INVALIDATED
   } else if (token->type == TOKEN_SYMBOL) {
-    object = InternSymbol(data);
+    object = InternSymbol(data, error);
     // REFERENCES INVALIDATED
+    if (*error) {
+      free(data);
+      return nil;
+    }
   }
   free(data);
-  *success = 1;
+  *error = NO_ERROR;
   return object;
 }
 
-const u8 *ReadNextObject(const u8 *source, b64 *success) {
+const u8 *ReadNextObject(const u8 *source, enum ErrorCode *error) {
   struct Token token;
   source = NextToken(source, &token);
-  return ReadNextObjectFromToken(&token, source, success);
+  return ReadNextObjectFromToken(&token, source, error);
 }
 
-const u8 *ReadNextObjectFromToken(const struct Token *token, const u8 *source, b64 *success) {
+const u8 *ReadNextObjectFromToken(const struct Token *token, const u8 *source, enum ErrorCode *error) {
   if (IsSingleToken(token)) {
-    SetRegister(REGISTER_EXPRESSION, ProcessSingleToken(token, success));
+    SetRegister(REGISTER_EXPRESSION, ProcessSingleToken(token, error));
   } else if (token->type == TOKEN_LIST_OPEN) {
-    source = BeginReadList(source, success);
+    source = BeginReadList(source, error);
   } else if (token->type == TOKEN_SYMBOLIC_QUOTE) {
-    source = ReadNextObject(source, success);
-    if (!*success)
+    source = ReadNextObject(source, error);
+    if (*error)
       return source;
 
     // read-result: object
-    Object result = AllocatePair();
+    Object result = AllocatePair(error);
+    if (*error)
+      return source;
     SetCar(result, GetRegister(REGISTER_EXPRESSION));
     SetCdr(result, nil);
     SetRegister(REGISTER_EXPRESSION, result);
     // read-result: (object)
 
-    result = AllocatePair();
+    result = AllocatePair(error);
+    if (*error)
+      return source;
+    Object quote = FindSymbol("quote");
+    assert(!IsNil(quote));
     SetCar(result, FindSymbol("quote"));
     SetCdr(result, GetRegister(REGISTER_EXPRESSION));
     SetRegister(REGISTER_EXPRESSION, result);
     // read-result: (quote object)
   } else if (token->type == TOKEN_LINE_COMMENT) {
     // discard
-    source = ReadNextObject(source, success);
+    source = ReadNextObject(source, error);
   } else if (IsErrorToken(token)) {
-    HandleErrorToken(token, success);
+    HandleErrorToken(token, error);
   } else if (token->type == TOKEN_PAIR_SEPARATOR) {
     LOG_ERROR("Invalid placement for pair separator\n");
-    *success = 0;
+    *error = ERROR_READ_INVALID_PAIR_SEPARATOR;
   } else if (token->type == TOKEN_LIST_CLOSE) {
     LOG_ERROR("Unmatched list close\n");
-    *success = 0;
+    *error = ERROR_READ_UNMATCHED_LIST_CLOSE;
   }
   return source;
 }
 
-const u8 *ReadNextListObject(const struct Token *token, const u8 *source, b64 *success) {
+const u8 *ReadNextListObject(const struct Token *token, const u8 *source, enum ErrorCode *error) {
   // (a b c d)
   //    ^-here
-  source = ReadNextObjectFromToken(token, source, success);
+  source = ReadNextObjectFromToken(token, source, error);
   LOG("Read in ");
   PrintlnObject(GetRegister(REGISTER_EXPRESSION));
-  if (!*success) return source;
+  if (*error) return source;
   // (a b c d)
   //     ^-here
   // stack: (a)
-  PushReadResultOntoStack();
+  *error = PushReadResultOntoStack();
+  if (*error) {
+    return source;
+  }
   LOG("pushing it onto the read stack: ");
   PrintlnObject(GetRegister(REGISTER_READ_STACK));
   
   // stack: ((b . nil) (a . nil))
-  source = ContinueReadList(source, success);
-  if (!*success) return source;
+  source = ContinueReadList(source, error);
+  if (*error) return source;
   // (a b c d)
   //          ^-here
   LOG("Read the rest of the list: ");
@@ -202,22 +226,23 @@ const u8 *ReadNextListObject(const struct Token *token, const u8 *source, b64 *s
   return source;
 }
 
-const u8 *BeginReadList(const u8 *source, b64 *success) {
+const u8 *BeginReadList(const u8 *source, enum ErrorCode *error) {
   struct Token token;
   NextToken(source, &token);
   if (token.type == TOKEN_PAIR_SEPARATOR) {
     LOG_ERROR("Attempt to parse pair separator in the first position of list\n");
-    *success = 0;
+    *error = ERROR_READ_PAIR_SEPARATOR_IN_FIRST_POSITION;
+    return source;
   }
-  return ContinueReadList(source, success);
+  return ContinueReadList(source, error);
 }
 
-const u8 *ContinueReadList(const u8 *source, b64 *success) {
+const u8 *ContinueReadList(const u8 *source, enum ErrorCode *error) {
   // ( a b c ... )
   //    ^-here    
   struct Token token;
   source = NextToken(source, &token);
-  *success = 1;
+  *error = NO_ERROR;
 
   // List is the form (a b c)
   //                        ^-here
@@ -229,8 +254,8 @@ const u8 *ContinueReadList(const u8 *source, b64 *success) {
   } else if (token.type == TOKEN_PAIR_SEPARATOR) {
     // (... c . d)
     //         ^-here
-    source = ReadNextObject(source, success);
-    if (!*success) return source;
+    source = ReadNextObject(source, error);
+    if (*error) return source;
     // (... c . d)
     //           ^-here
     source = NextToken(source, &token);
@@ -238,18 +263,18 @@ const u8 *ContinueReadList(const u8 *source, b64 *success) {
     //            ^-here
     if (token.type != TOKEN_LIST_CLOSE) {
       LOG_ERROR("expected close-list after object following pair separator\n");
-      *success = 0;
+      *error = ERROR_READ_TOO_MANY_OBJECTS_IN_PAIR;
       return source;
     }
     // read result: d
     
   // List is malformed
   } else if (IsErrorToken(&token)) {
-    HandleErrorToken(&token, success);
+    HandleErrorToken(&token, error);
 
   // More elements in the list.
   } else {
-    source = ReadNextListObject(&token, source, success);
+    source = ReadNextListObject(&token, source, error);
     // read result (b . (c . nil))
   }
   return source;
@@ -262,14 +287,14 @@ b64 SymbolEq(Object symbol, const u8 *name) {
 void TestRead() {
   InitializeMemory(128);
   InitializeSymbolTable(1);
-  InternSymbol("quote");
-  b64 success = 0;
+  enum ErrorCode error = NO_ERROR;
+  InternSymbol("quote", &error);
 
   // Read string
   {
     const u8* source = "\"abra\"";
-    source = ReadObject(source, &success);
-    assert(success);
+    source = ReadObject(source, &error);
+    assert(!error);
     assert(IsString(GetRegister(REGISTER_EXPRESSION)));
     assert(!strcmp("abra", StringCharacterBuffer(GetRegister(REGISTER_EXPRESSION))));
   }
@@ -277,8 +302,8 @@ void TestRead() {
   // Read integer
   {
     const u8* source = "-12345";
-    source = ReadObject(source, &success);
-    assert(success);
+    source = ReadObject(source, &error);
+    assert(!error);
     assert(IsFixnum(GetRegister(REGISTER_EXPRESSION)));
     assert(-12345 == UnboxFixnum(GetRegister(REGISTER_EXPRESSION)));
   }
@@ -286,8 +311,8 @@ void TestRead() {
   // Read real64
   {
     const u8* source = "-123.4e5";
-    source = ReadObject(source, &success);
-    assert(success);
+    source = ReadObject(source, &error);
+    assert(!error);
     assert(IsReal64(GetRegister(REGISTER_EXPRESSION)));
     assert(-123.4e5 == UnboxReal64(GetRegister(REGISTER_EXPRESSION)));
   }
@@ -295,8 +320,8 @@ void TestRead() {
   // Read symbol
   {
     const u8* source = "the-symbol";
-    source = ReadObject(source, &success);
-    assert(success);
+    source = ReadObject(source, &error);
+    assert(!error);
     assert(SymbolEq(GetRegister(REGISTER_EXPRESSION), "the-symbol"));
     assert(!strcmp("the-symbol", StringCharacterBuffer(GetRegister(REGISTER_EXPRESSION))));
   }
@@ -304,16 +329,16 @@ void TestRead() {
   // Read ()
   {
     const u8* source = " (     \n)";
-    source = ReadObject(source, &success);
-    assert(success);
+    source = ReadObject(source, &error);
+    assert(!error);
     assert(IsNil(GetRegister(REGISTER_EXPRESSION)));
   }
 
   // Read Pair
   {
     const u8* source = " (a . b)";
-    source = ReadObject(source, &success);
-    assert(success);
+    source = ReadObject(source, &error);
+    assert(!error);
     assert(IsPair(GetRegister(REGISTER_EXPRESSION)));
     assert(SymbolEq(Car(GetRegister(REGISTER_EXPRESSION)), "a"));
     assert(SymbolEq(Cdr(GetRegister(REGISTER_EXPRESSION)), "b"));
@@ -322,8 +347,8 @@ void TestRead() {
   // Read List
   {
     const u8* source = " (a)";
-    source = ReadObject(source, &success);
-    assert(success);
+    source = ReadObject(source, &error);
+    assert(!error);
     assert(IsPair(GetRegister(REGISTER_EXPRESSION)));
     assert(SymbolEq(Car(GetRegister(REGISTER_EXPRESSION)), "a"));
     assert(IsNil(Cdr(GetRegister(REGISTER_EXPRESSION))));
@@ -333,8 +358,8 @@ void TestRead() {
   {
     const u8* source = " ((a . b) (c . d) . (e . f))";
     //                    st      uv         w
-    source = ReadObject(source, &success);
-    assert(success);
+    source = ReadObject(source, &error);
+    assert(!error);
     Object s = GetRegister(REGISTER_EXPRESSION);
     Object t = Car(s);
     Object u = Cdr(s);
@@ -353,8 +378,8 @@ void TestRead() {
   {
     const u8* source = "(a b (c d . e) (f g) h)";
     //                   s t uv w      xy z  S
-    source = ReadObject(source, &success);
-    assert(success);
+    source = ReadObject(source, &error);
+    assert(!error);
     Object s = GetRegister(REGISTER_EXPRESSION);
     Object t = Cdr(s);
     Object u = Cdr(t);
@@ -382,8 +407,8 @@ void TestRead() {
     const u8* source = "'(a b)";
     // (quote . ((a . (b . nil)) . nil))
     //  s        tu    v
-    source = ReadObject(source, &success);
-    assert(success);
+    source = ReadObject(source, &error);
+    assert(!error);
     Object s = GetRegister(REGISTER_EXPRESSION);
     Object t = Cdr(s);
     Object u = Car(t);
@@ -393,6 +418,8 @@ void TestRead() {
     assert(SymbolEq(Car(u), "a"));
     assert(SymbolEq(Car(v), "b"));
   }
+
+  // TODO: read some invalid forms
 
   DestroyMemory();
 }

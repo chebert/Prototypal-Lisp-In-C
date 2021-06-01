@@ -9,7 +9,7 @@
 
 Object AllocateCompoundProcedure() {
   enum ErrorCode error = EnsureEnoughMemory(3);
-  if (!error) {
+  if (error) {
     // TODO
     return nil;
   }

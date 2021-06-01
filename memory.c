@@ -125,13 +125,19 @@ void DestroyMemory() {
   free(memory.new_objects);
 }
 
+b64 HasEnoughMemory(u64 num_objects_required) {
+  return memory.free + num_objects_required <= memory.max_objects;
+}
+
 enum ErrorCode EnsureEnoughMemory(u64 num_objects_required) {
-  if (!(memory.free + num_objects_required <= memory.max_objects)) {
+  if (!HasEnoughMemory(num_objects_required)) {
     CollectGarbage();
   }
-  if (!(memory.free + num_objects_required <= memory.max_objects)) {
+
+  if (!HasEnoughMemory(num_objects_required)) {
     return ERROR_OUT_OF_MEMORY;
   }
+  return NO_ERROR;
 }
 
 void PrintObject(Object object) {
@@ -199,7 +205,9 @@ void PrintMemory() {
 
 // Unsafe, only for testing
 static Object MakePair(Object car, Object cdr) {
-  Object pair = AllocatePair();
+  enum ErrorCode error;
+  Object pair = AllocatePair(&error);
+  assert(!error);
   // REFERENCES INVALIDATED
   SetCar(pair, car);
   SetCdr(pair, cdr);
@@ -212,7 +220,7 @@ void TestMemory() {
   Object string = AllocateString("Hello");
 
   enum ErrorCode error;
-  Object vector = AllocateVector(3);
+  Object vector = AllocateVector(3, &error);
   VectorSet(vector, 0, AllocateString("Zero"), &error);
   VectorSet(vector, 1, AllocateString("One"), &error);
   VectorSet(vector, 2, AllocateString("Two"), &error);
@@ -247,7 +255,7 @@ void TestMemory() {
       memory.num_objects_moved * 1.0 / memory.num_collections);
 
   SetRegister(REGISTER_EXPRESSION, nil);
-  SetRegister(REGISTER_EXPRESSION, AllocateVector(30 - NUM_REGISTERS));
+  SetRegister(REGISTER_EXPRESSION, AllocateVector(30 - NUM_REGISTERS, &error));
   LOG("Root: ");
   PrintlnObject(GetRegister(REGISTER_EXPRESSION));
   DestroyMemory();

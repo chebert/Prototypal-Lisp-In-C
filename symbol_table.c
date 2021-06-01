@@ -11,7 +11,7 @@
 #include "symbol.h"
 #include "vector.h"
 
-Object InternNewSymbol(u64 index, const u8 *name);
+Object InternNewSymbol(u64 index, const u8 *name, enum ErrorCode *error);
 
 // Returns true if the string object is deep equal the string name
 b64 IsSymbolEqual(Object symbol, const u8 *name);
@@ -37,7 +37,10 @@ void InitializeSymbolTable(u64 size) {
 
 // A Symbol table is a Hashed set, represented as a vector of Symbol Lists
 Object MakeSymbolTable(u64 size) {
-  return AllocateVector(size);
+  enum ErrorCode error;
+  Object table = AllocateVector(size, &error);
+  assert(!error);
+  return table;
 }
 
 
@@ -47,14 +50,14 @@ Object FindSymbol(const u8 *name) {
   return FindSymbolInSymbolList(symbol_table, index, name);
 }
 
-Object InternSymbol(const u8 *name) {
+Object InternSymbol(const u8 *name, enum ErrorCode *error) {
   Object symbol_table = GetSymbolTable();
   u64 index = GetSymbolListIndex(symbol_table, name);
   Object found = FindSymbolInSymbolList(symbol_table, index, name);
   if (found != nil)
     return found;
 
-  return InternNewSymbol(index, name);
+  return InternNewSymbol(index, name, error);
 }
 
 void UninternSymbol(const u8 *name) {
@@ -69,9 +72,10 @@ void UninternSymbol(const u8 *name) {
 
 // Helpers
 
-Object InternNewSymbol(u64 index, const u8 *name) {
+Object InternNewSymbol(u64 index, const u8 *name, enum ErrorCode *error) {
   // Create a new symbol and add it to the symbol list
-  Object new_symbols = AllocatePair();
+  Object new_symbols = AllocatePair(error);
+  if (*error) return nil;
   // REFERENCES INVALIDATED
 
   Object old_symbols = UnsafeVectorRef(GetSymbolTable(), index);
@@ -167,12 +171,13 @@ void TestSymbolTable() {
   Object symbol = FindSymbol(symbol_name);
   assert(symbol == nil);
 
-  symbol = InternSymbol(symbol_name);
+  enum ErrorCode error;
+  symbol = InternSymbol(symbol_name, &error);
   PrintlnObject(symbol);
 
   Object otherSymbol = FindSymbol(symbol_name);
   assert(symbol == otherSymbol);
-  otherSymbol = InternSymbol(symbol_name);
+  otherSymbol = InternSymbol(symbol_name, &error);
   assert(symbol == otherSymbol);
 
   UninternSymbol(symbol_name);
@@ -181,10 +186,10 @@ void TestSymbolTable() {
   DestroyMemory();
   InitializeMemory(128);
   InitializeSymbolTable(1);
-  InternSymbol(symbol_name);
-  InternSymbol("dimple");
-  InternSymbol("pimple");
-  InternSymbol("limp-pole");
+  InternSymbol(symbol_name, &error);
+  InternSymbol("dimple", &error);
+  InternSymbol("pimple", &error);
+  InternSymbol("limp-pole", &error);
   assert(FindSymbol(symbol_name) != nil);
   UninternSymbol("dimple");
   assert(FindSymbol("dimple") == nil);

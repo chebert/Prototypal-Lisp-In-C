@@ -1,6 +1,7 @@
 #ifndef ROOT_H
 #define ROOT_H
 
+#include "error.h"
 #include "tag.h"
 
 // At the root of memory is a vector of registers, holding all of the data/references
@@ -26,7 +27,7 @@ enum Register {
 Object GetRegister(enum Register reg);
 void SetRegister(enum Register reg, Object value);
 
-void Save(enum Register reg);
+void Save(enum Register reg, enum ErrorCode *error);
 void Restore(enum Register reg);
 
 EvaluateFunction GetContinue();

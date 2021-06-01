@@ -14,7 +14,7 @@ u64 CeilingU64(u64 numerator, u64 denominator);
 u64 AllocateBlob(u64 num_bytes) {
   u64 num_objects = NumObjectsPerBlob(num_bytes);
   enum ErrorCode error = EnsureEnoughMemory(num_objects);
-  if (!error) {
+  if (error) {
     // TODO
     return 0;
   }
