@@ -59,18 +59,49 @@ Object MoveVector(Object vector) {
   return BoxVector(new_reference);
 }
 
-s64 VectorLength(Object vector) {
+s64 UnsafeVectorLength(Object vector) {
   assert(IsVector(vector));
   return UnboxFixnum(memory.the_objects[UnboxReference(vector)]);
 }
-Object VectorRef(Object vector, u64 index) {
+Object UnsafeVectorRef(Object vector, u64 index) {
   assert(IsVector(vector));
-  assert(index < VectorLength(vector));
+  assert(index < UnsafeVectorLength(vector));
   return memory.the_objects[UnboxReference(vector)+1 + index];
 }
-void VectorSet(Object vector, u64 index, Object value) {
+void UnsafeVectorSet(Object vector, u64 index, Object value) {
   assert(IsVector(vector));
-  assert(index < VectorLength(vector));
+  assert(index < UnsafeVectorLength(vector));
+  memory.the_objects[UnboxReference(vector)+1 + index] = value;
+}
+
+s64 VectorLength(Object vector, enum ErrorCode *error) {
+  if (!IsVector(vector)) {
+    *error = ERROR_VECTOR_LENGTH_NON_VECTOR;
+    return 0;
+  }
+  return UnboxFixnum(memory.the_objects[UnboxReference(vector)]);
+}
+Object VectorRef(Object vector, u64 index, enum ErrorCode *error) {
+  if (!IsVector(vector)) {
+    *error = ERROR_VECTOR_REFERENCE_NON_VECTOR;
+    return nil;
+  }
+  if (index >= UnsafeVectorLength(vector)) {
+    *error = ERROR_VECTOR_REFERENCE_INDEX_OUT_OF_RANGE;
+    return nil;
+  }
+  return memory.the_objects[UnboxReference(vector)+1 + index];
+}
+
+void VectorSet(Object vector, u64 index, Object value, enum ErrorCode *error) {
+  if (!IsVector(vector)) {
+    *error = ERROR_VECTOR_SET_NON_VECTOR;
+    return;
+  }
+  if (index >= UnsafeVectorLength(vector)) {
+    *error = ERROR_VECTOR_SET_INDEX_OUT_OF_RANGE;
+    return;
+  }
   memory.the_objects[UnboxReference(vector)+1 + index] = value;
 }
 

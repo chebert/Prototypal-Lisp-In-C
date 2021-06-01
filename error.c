@@ -3,7 +3,7 @@
 #include <assert.h>
 
 static const u8 *error_code_strings[] = {
-#define X(value, string) string,
+#define X(value) #value,
     ERROR_CODES
 #undef X
   };

@@ -60,10 +60,10 @@ Object InternSymbol(const u8 *name) {
 void UninternSymbol(const u8 *name) {
   Object symbol_table = GetSymbolTable();
   u64 index = GetSymbolListIndex(symbol_table, name);
-  Object symbols = VectorRef(symbol_table, index);
+  Object symbols = UnsafeVectorRef(symbol_table, index);
 
   Object new_symbols = RemoveSymbolDestructively(symbols, name);
-  VectorSet(symbol_table, index, new_symbols);
+  UnsafeVectorSet(symbol_table, index, new_symbols);
 }
 
 
@@ -74,20 +74,20 @@ Object InternNewSymbol(u64 index, const u8 *name) {
   Object new_symbols = AllocatePair();
   // REFERENCES INVALIDATED
 
-  Object old_symbols = VectorRef(GetSymbolTable(), index);
-  VectorSet(GetSymbolTable(), index, new_symbols);
+  Object old_symbols = UnsafeVectorRef(GetSymbolTable(), index);
+  UnsafeVectorSet(GetSymbolTable(), index, new_symbols);
 
   SetCdr(new_symbols, old_symbols);
   SetCar(new_symbols, AllocateSymbol(name));
   // REFERENCES INVALIDATED
 
   // Return the new symbol.
-  return Car(VectorRef(GetSymbolTable(), index));
+  return Car(UnsafeVectorRef(GetSymbolTable(), index));
 }
 
 u64 GetSymbolListIndex(Object symbol_table, const u8 *name) {
   u32 hash = HashString(name);
-  s64 length = VectorLength(symbol_table);
+  s64 length = UnsafeVectorLength(symbol_table);
   return hash % length;
 }
 
@@ -127,7 +127,7 @@ Object RemoveSymbolDestructively(Object symbols, const u8 *name) {
 }
 
 Object FindSymbolInSymbolList(Object symbol_table, u64 index, const u8 *name) {
-  for (Object symbols = VectorRef(symbol_table, index);
+  for (Object symbols = UnsafeVectorRef(symbol_table, index);
       symbols != nil;
       symbols = Rest(symbols)) {
     Object symbol = First(symbols);

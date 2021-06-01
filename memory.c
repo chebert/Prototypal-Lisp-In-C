@@ -211,12 +211,12 @@ void TestMemory() {
   MakePair(BoxFixnum(4), BoxFixnum(2));
   Object string = AllocateString("Hello");
 
-  Object vector = AllocateVector(3);
-  VectorSet(vector, 0, AllocateString("Zero"));
-  VectorSet(vector, 1, AllocateString("One"));
-  VectorSet(vector, 2, AllocateString("Two"));
-
   enum ErrorCode error;
+  Object vector = AllocateVector(3);
+  VectorSet(vector, 0, AllocateString("Zero"), &error);
+  VectorSet(vector, 1, AllocateString("One"), &error);
+  VectorSet(vector, 2, AllocateString("Two"), &error);
+
   Object byte_vector = AllocateByteVector(4);
   ByteVectorSet(byte_vector, 0, 0xc, &error);
   ByteVectorSet(byte_vector, 1, 0xa, &error);

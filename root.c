@@ -10,11 +10,11 @@ void InitializeRoot() {
 }
 
 Object GetRegister(enum Register reg) {
-  return VectorRef(memory.root, reg); 
+  return UnsafeVectorRef(memory.root, reg); 
 }
 
 void SetRegister(enum Register reg, Object value) {
-  VectorSet(memory.root, reg, value); 
+  UnsafeVectorSet(memory.root, reg, value); 
 }
 
 void Save(enum Register reg) {
