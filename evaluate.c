@@ -1,7 +1,5 @@
 #include "evaluate.h"
 
-#include <assert.h>
-
 #include "compound_procedure.h"
 #include "environment.h"
 #include "log.h"

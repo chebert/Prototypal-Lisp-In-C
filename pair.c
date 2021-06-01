@@ -8,7 +8,11 @@
 #include "root.h"
 
 Object AllocatePair() {
-  EnsureEnoughMemory(2);
+  enum ErrorCode error = EnsureEnoughMemory(2);
+  if (!error) {
+    // TODO:
+    return nil;
+  }
 
   // [ ..., free.. ]
   u64 new_reference = memory.free;

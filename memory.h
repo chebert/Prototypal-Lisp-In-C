@@ -1,6 +1,7 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
+#include "error.h"
 #include "tag.h"
 
 // Memory is managed using a stop-and-copy garbage collection algorithm.
@@ -61,8 +62,8 @@ void DestroyMemory();
 void CollectGarbage();
 
 // Performs a garbage collection if there isn't enough memory.
-// If there still isn't enough memory, causes an exception.
-void EnsureEnoughMemory(u64 num_objects_required);
+// If there still isn't enough memory, returns an out of memory error.
+enum ErrorCode EnsureEnoughMemory(u64 num_objects_required);
 
 // Warning: Every time you Allocate, all references in C code may be invalid.
 

@@ -13,7 +13,11 @@ u64 CeilingU64(u64 numerator, u64 denominator);
 
 u64 AllocateBlob(u64 num_bytes) {
   u64 num_objects = NumObjectsPerBlob(num_bytes);
-  EnsureEnoughMemory(num_objects);
+  enum ErrorCode error = EnsureEnoughMemory(num_objects);
+  if (!error) {
+    // TODO
+    return 0;
+  }
   // [ ..., free.. ]
 
   u64 new_reference = memory.free;

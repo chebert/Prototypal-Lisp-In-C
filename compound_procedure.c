@@ -8,7 +8,11 @@
 #include "tag.h"
 
 Object AllocateCompoundProcedure() {
-  EnsureEnoughMemory(3);
+  enum ErrorCode error = EnsureEnoughMemory(3);
+  if (!error) {
+    // TODO
+    return nil;
+  }
 
   // [ ..., free.. ]
   u64 new_reference = memory.free;

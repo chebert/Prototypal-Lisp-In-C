@@ -8,7 +8,11 @@
 #include "memory.h"
 
 Object AllocateVector(u64 num_objects) {
-  EnsureEnoughMemory(num_objects + 1);
+  enum ErrorCode error = EnsureEnoughMemory(num_objects + 1);
+  if (!error) {
+    // TODO:
+    return nil;
+  }
   // [ ..., free.. ]
   u64 new_reference = memory.free;
 

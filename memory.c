@@ -125,11 +125,13 @@ void DestroyMemory() {
   free(memory.new_objects);
 }
 
-void EnsureEnoughMemory(u64 num_objects_required) {
+enum ErrorCode EnsureEnoughMemory(u64 num_objects_required) {
   if (!(memory.free + num_objects_required <= memory.max_objects)) {
     CollectGarbage();
   }
-  assert(memory.free + num_objects_required <= memory.max_objects);
+  if (!(memory.free + num_objects_required <= memory.max_objects)) {
+    return ERROR_OUT_OF_MEMORY;
+  }
 }
 
 void PrintObject(Object object) {
@@ -214,11 +216,12 @@ void TestMemory() {
   VectorSet(vector, 1, AllocateString("One"));
   VectorSet(vector, 2, AllocateString("Two"));
 
+  enum ErrorCode error;
   Object byte_vector = AllocateByteVector(4);
-  ByteVectorSet(byte_vector, 0, 0xc);
-  ByteVectorSet(byte_vector, 1, 0xa);
-  ByteVectorSet(byte_vector, 2, 0xf);
-  ByteVectorSet(byte_vector, 3, 0xe);
+  ByteVectorSet(byte_vector, 0, 0xc, &error);
+  ByteVectorSet(byte_vector, 1, 0xa, &error);
+  ByteVectorSet(byte_vector, 2, 0xf, &error);
+  ByteVectorSet(byte_vector, 3, 0xe, &error);
 
   Object shared = MakePair(byte_vector, string);
   SetRegister(REGISTER_EXPRESSION, MakePair(shared, MakePair(shared, vector)));
