@@ -40,37 +40,42 @@ void SetVariableValue(Object variable, Object value, Object environment) {
   SetCar(values, value);
 }
 
-void DefineVariable(enum Register variable, enum Register value, enum Register environment) {
+void DefineVariable() {
   // Environment := (scope . more-scopes)
   // Scope       := (variables . values)
   {
     Object new_variables = AllocatePair();
-    SetCar(new_variables, GetRegister(variable));
-    Object scope = InnerScope(GetRegister(environment));
-    SetCdr(new_variables, ScopeVariables(scope));
-    SetScopeVariables(scope, new_variables);
+    SetCar(new_variables, GetUnevaluated());
+    Object inner_scope = InnerScope(GetEnvironment());
+    SetCdr(new_variables, ScopeVariables(inner_scope));
+    SetScopeVariables(inner_scope, new_variables);
   }
   {
     Object new_values = AllocatePair();
-    SetCar(new_values, GetRegister(value));
-    Object scope = InnerScope(GetRegister(environment));
-    SetCdr(new_values, ScopeValues(scope));
-    SetScopeValues(scope, new_values);
+    SetCar(new_values, GetValue());
+    Object inner_scope = InnerScope(GetEnvironment());
+    SetCdr(new_values, ScopeValues(inner_scope));
+    SetScopeValues(inner_scope, new_values);
   }
 }
 
-void ExtendEnvironment(enum Register parameters, enum Register arguments, enum Register environment) {
+void ExtendEnvironment() {
   {
     Object new_environment = AllocatePair();
-    SetCdr(new_environment, GetRegister(environment));
-    SetRegister(environment, new_environment);
+    SetCdr(new_environment, GetEnvironment());
+    SetEnvironment(new_environment);
   }
 
   Object new_scope = AllocateScope();
-  SetScopeVariables(new_scope, GetRegister(parameters));
-  SetScopeValues(new_scope, GetRegister(arguments));
+  SetScopeVariables(new_scope, GetUnevaluated());
+  SetScopeValues(new_scope, GetArgumentList());
 
-  SetInnerScope(GetRegister(environment), new_scope);
+  SetInnerScope(GetEnvironment(), new_scope);
+}
+
+void MakeInitialEnvironment() {
+  SetEnvironment(AllocatePair());
+  SetInnerScope(GetEnvironment(), AllocateScope());
 }
 
 Object LookupVariableReference(Object variable, Object environment) {

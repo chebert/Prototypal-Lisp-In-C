@@ -114,14 +114,19 @@ Object PrimitiveSubtractFixnumFixnum(Object arguments) {
   return BoxFixnum(UnboxFixnum(a) - UnboxFixnum(b));
 }
 
-// TODO: fill the global environment
-PrimitiveFunction primitives[] = {
-  PrimitiveAddFixnumFixnum,
-  PrimitiveSubtractFixnumFixnum,
-};
+#define PRIMITIVES \
+  X("+", PrimitiveAddFixnumFixnum) \
+  X("-", PrimitiveSubtractFixnumFixnum)
+
 const u8 *primitive_names[] = {
-  "+",
-  "-",
+#define X(name, function) name,
+  PRIMITIVES
+#undef X
+};
+PrimitiveFunction primitives[] = {
+#define X(name, function) function,
+  PRIMITIVES
+#undef X
 };
 #define NUM_PRIMITIVES (sizeof(primitives) / sizeof(primitives[0]))
 
@@ -132,8 +137,14 @@ void DefinePrimitive(const u8 *name, PrimitiveFunction function) {
 }
 
 Object Evaluate(Object expression) {
+  // Set the expression to be evaluated.
   SetExpression(expression);
+
+  // Clear the stack.
   SetRegister(REGISTER_STACK, nil);
+
+  // Ensure that the evaluator can find all the necessary symbols.
+  // to avoid allocating during EvaluateDispatch.
   InternSymbol("quote");
   InternSymbol("set!");
   InternSymbol("define");
@@ -143,18 +154,23 @@ Object Evaluate(Object expression) {
   InternSymbol("ok");
 
   // Create the initial environment
-  SetEnvironment(AllocatePair());
-  SetCar(GetEnvironment(), AllocatePair());
+  MakeInitialEnvironment();
 
+  // Add primitive functions to the initial environment
   for (int i = 0; i < NUM_PRIMITIVES; ++i)
     DefinePrimitive(primitive_names[i], primitives[i]);
 
-  SetContinue(NULL);
+  // Set continue to quit when evaluation finishes.
+  SetContinue(0);
+
+  // Start the evaluation by evaluating the provided expression.
   next = EvaluateDispatch;
 
+  // Run the evaluation loop until quit.
   while (next)
     next();
 
+  // Return the evaluated expression.
   return GetValue();
 }
 
@@ -241,8 +257,9 @@ void EvaluateLambda() {
   Object expression = GetExpression();
   SetUnevaluated(LambdaParameters(expression));
   SetExpression(LambdaBody(expression));
+  LOG("Lambda body: ");
+  PrintlnObject(GetExpression());
   SetValue(MakeProcedure());
-  PrintlnObject(GetValue());
   next = GetContinue();
 }
 
@@ -281,9 +298,10 @@ void EvaluateApplicationOperands() {
 }
 
 Object SetLastCdr(Object list, Object last_pair) {
+  // List is empty. The resulting list is just last_pair.
   if (IsNil(list)) return last_pair;
-  Object head = list;
 
+  Object head = list;
   for (; IsPair(Cdr(list)); list = Cdr(list))
     ;
   SetCdr(list, last_pair);
@@ -353,8 +371,10 @@ void EvaluateApplicationDispatch() {
     // Compound-procedure application
     SetUnevaluated(ProcedureParameters(proc));
     SetEnvironment(ProcedureEnvironment(proc));
-    ExtendEnvironment(REGISTER_UNEVALUATED, REGISTER_ARGUMENT_LIST, REGISTER_ENVIRONMENT);
+    LOG("Extending the environment");
+    ExtendEnvironment();
 
+    proc = GetProcedure();
     SetUnevaluated(ProcedureBody(proc));
     next = EvaluateSequence;
   } else {
@@ -387,6 +407,7 @@ void EvaluateSequenceLastExpression() {
 void EvaluateSequence() {
   LOG("Evaluate sequence");
   Object unevaluated = GetUnevaluated();
+  PrintlnObject(unevaluated);
   SetExpression(FirstExpression(unevaluated));
 
   if (IsLastExpression(unevaluated)) {
@@ -462,7 +483,7 @@ void EvaluateDefinition1() {
   LOG("Restored environment");
   Restore(REGISTER_UNEVALUATED);
   LOG("Restored unevaluated");
-  DefineVariable(REGISTER_UNEVALUATED, REGISTER_VALUE, REGISTER_ENVIRONMENT);
+  DefineVariable();
   LOG("defining variable");
   PrintlnObject(GetEnvironment());
   // Return the symbol name as the result of the definition.
@@ -500,7 +521,7 @@ void EvaluateUnknown() {
 }
 
 void EvaluateError() {
-  LOG_ERROR("Error");
+  LOG_ERROR("Error occurred.");
   next = 0;
 }
 
@@ -560,7 +581,7 @@ Object MakeProcedure() {
 }
 
 void TestEvaluate() {
-  InitializeMemory(4096);
+  InitializeMemory(128);
   InitializeSymbolTable(1);
   PrintlnObject(Evaluate(BoxFixnum(42)));
 

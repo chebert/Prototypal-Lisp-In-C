@@ -37,7 +37,7 @@ Object MoveCompoundProcedure(Object procedure) {
   }
 
   LOG("Moving from the_objects to new_objects, leaving a broken heart at %llu pointing to %llu\n", ref, new_reference);
-  Object moved_pair = BoxPair(new_reference);
+  Object moved_procedure = BoxCompoundProcedure(new_reference);
   // Old: [ ..., environment, parameters, body, ... ]
   memory.new_objects[memory.free++] = old_environment; // environment
   memory.new_objects[memory.free++] = memory.the_objects[ref+1]; // parameters
@@ -45,7 +45,7 @@ Object MoveCompoundProcedure(Object procedure) {
   // New: [ ..., environment, parameters, body, free.. ]
   memory.the_objects[ref] = BoxBrokenHeart(new_reference);
   // Old: [ ...,  <BH new>, ... ]
-  return moved_pair;
+  return moved_procedure;
 }
 
 Object ProcedureEnvironment(Object procedure) {

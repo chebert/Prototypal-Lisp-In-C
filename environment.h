@@ -18,9 +18,11 @@ void SetVariableValue(Object variable, Object value, Object environment);
 
 // Creates a new variable in the innermost scope, bound to value.
 // If the variable is already in the environment, causes an error.
-void DefineVariable(enum Register variable, enum Register value, enum Register environment);
+void DefineVariable();
 // Creates an environment with a new scope/frame added to the provided environment.
 // The symbols in parameters are associated with the values in arguments in the new scope.
-void ExtendEnvironment(enum Register parameters, enum Register arguments, enum Register environment);
+void ExtendEnvironment();
+
+void MakeInitialEnvironment();
 
 #endif
