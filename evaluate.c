@@ -53,6 +53,8 @@ void EvaluateIfDecide();
 void EvaluateAssignment1();
 void EvaluateDefinition1();
 
+void EvaluateError();
+
 static Object MakeProcedure();
 
 Object Second(Object list);
@@ -99,10 +101,34 @@ b64 IsLastExpression(Object sequence);
 
 static EvaluateFunction next;
 
-Object AddFixnumFixnum(Object arguments) {
+// Primitives
+Object PrimitiveAddFixnumFixnum(Object arguments) {
   Object a = First(arguments);
   Object b = Second(arguments);
   return BoxFixnum(UnboxFixnum(a) + UnboxFixnum(b));
+}
+
+Object PrimitiveSubtractFixnumFixnum(Object arguments) {
+  Object a = First(arguments);
+  Object b = Second(arguments);
+  return BoxFixnum(UnboxFixnum(a) - UnboxFixnum(b));
+}
+
+// TODO: fill the global environment
+PrimitiveFunction primitives[] = {
+  PrimitiveAddFixnumFixnum,
+  PrimitiveSubtractFixnumFixnum,
+};
+const u8 *primitive_names[] = {
+  "+",
+  "-",
+};
+#define NUM_PRIMITIVES (sizeof(primitives) / sizeof(primitives[0]))
+
+void DefinePrimitive(const u8 *name, PrimitiveFunction function) {
+  SetUnevaluated(InternSymbol(name));
+  SetValue(BoxPrimitiveProcedure(function));
+  DefineVariable(REGISTER_UNEVALUATED, REGISTER_VALUE, REGISTER_ENVIRONMENT);
 }
 
 Object Evaluate(Object expression) {
@@ -115,12 +141,13 @@ Object Evaluate(Object expression) {
   InternSymbol("fn");
   InternSymbol("begin");
   InternSymbol("ok");
-  // TODO: fill the global environment
+
+  // Create the initial environment
   SetEnvironment(AllocatePair());
   SetCar(GetEnvironment(), AllocatePair());
-  SetUnevaluated(InternSymbol("+"));
-  SetValue(BoxPrimitiveProcedure(AddFixnumFixnum));
-  DefineVariable(REGISTER_UNEVALUATED, REGISTER_VALUE, REGISTER_ENVIRONMENT);
+
+  for (int i = 0; i < NUM_PRIMITIVES; ++i)
+    DefinePrimitive(primitive_names[i], primitives[i]);
 
   SetContinue(NULL);
   next = EvaluateDispatch;
@@ -185,6 +212,7 @@ b64 IsApplication(Object expression) { return IsPair(expression); }
 
 void EvaluateSelfEvaluating() {
   Object expression = GetExpression();
+  LOG("Self evaluating");
   SetValue(expression);
   next = GetContinue();
 }
@@ -196,30 +224,37 @@ void EvaluateVariable() {
   Object value = LookupVariableValue(GetExpression(), GetEnvironment(), &found);
   if (!found) {
     LOG_ERROR("Could not find %s in environment", StringCharacterBuffer(GetExpression()));
+    next = EvaluateError;
+  } else {
+    SetValue(value);
+    next = GetContinue();
   }
-  SetValue(value);
-  next = GetContinue();
 }
 void EvaluateQuoted() {
+  LOG("Quoted expression");
   Object expression = GetExpression();
   SetValue(Second(expression));
   next = GetContinue();
 }
 void EvaluateLambda() {
+  LOG("Lambda expression");
   Object expression = GetExpression();
   SetUnevaluated(LambdaParameters(expression));
   SetExpression(LambdaBody(expression));
   SetValue(MakeProcedure());
+  PrintlnObject(GetValue());
   next = GetContinue();
 }
 
 void EvaluateApplication() {
+  LOG("Application");
   Object expression = GetExpression();
   Save(REGISTER_CONTINUE);
   Save(REGISTER_ENVIRONMENT);
   SetUnevaluated(Operands(expression));
   Save(REGISTER_UNEVALUATED);
   // Evaluate the operator
+  LOG("Evaluating operator");
   SetExpression(Operator(expression));
   SetContinue(EvaluateApplicationOperands);
   next = EvaluateDispatch;
@@ -233,8 +268,10 @@ void EvaluateApplicationOperands() {
   SetProcedure(GetValue());
   SetArgumentList(EmptyArgumentList());
 
+  LOG("Evaluating operands");
   if (HasNoOperands(GetUnevaluated())) {
     // CASE: No operands
+    LOG("No operands");
     next = EvaluateApplicationDispatch;
   } else {
     // CASE: 1 or more operands
@@ -256,11 +293,12 @@ Object SetLastCdr(Object list, Object last_pair) {
 void AdjoinArgument() {
   Object last_pair = AllocatePair();
   SetCar(last_pair, GetValue());
-  Object arguments = SetLastCdr(GetArgumentList(), last_pair);
-  SetArgumentList(arguments);
+
+  SetArgumentList(SetLastCdr(GetArgumentList(), last_pair));
 }
 
 void EvaluateApplicationAccumulateArgument() {
+  LOG("Accumulating argument");
   Restore(REGISTER_UNEVALUATED);
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_ARGUMENT_LIST);
@@ -270,6 +308,7 @@ void EvaluateApplicationAccumulateArgument() {
 }
 
 void EvaluateApplicationAccumulateLastArgument() {
+  LOG("Accumulating last argument");
   Restore(REGISTER_ARGUMENT_LIST);
   AdjoinArgument();
   Restore(REGISTER_PROCEDURE);
@@ -277,11 +316,13 @@ void EvaluateApplicationAccumulateLastArgument() {
 }
 
 void EvaluateApplicationLastOperand() {
+  LOG("last operand");
   SetContinue(EvaluateApplicationAccumulateLastArgument);
   next = EvaluateDispatch;
 }
 
 void EvaluateApplicationOperandLoop() {
+  LOG("Evaluating next operand");
   // Evaluate operands
   Save(REGISTER_ARGUMENT_LIST);
 
@@ -292,6 +333,7 @@ void EvaluateApplicationOperandLoop() {
     next = EvaluateApplicationLastOperand;
   } else {
     // CASE: 2+ arguments
+    LOG("not the last operand");
     Save(REGISTER_ENVIRONMENT);
     Save(REGISTER_UNEVALUATED);
     SetContinue(EvaluateApplicationAccumulateArgument);
@@ -300,6 +342,7 @@ void EvaluateApplicationOperandLoop() {
 }
 
 void EvaluateApplicationDispatch() {
+  LOG("Evaluate application: dispatch based on primitive/compound procedure");
   Object proc = GetProcedure();
   if (IsPrimitiveProcedure(proc)) {
     // Primitive-procedure application
@@ -316,17 +359,19 @@ void EvaluateApplicationDispatch() {
     next = EvaluateSequence;
   } else {
     LOG_ERROR("Unknown procedure type");
-    next = NULL;
+    next = EvaluateError;
   }
 }
 
 void EvaluateBegin() {
+  LOG("Evaluate begin");
   SetUnevaluated(BeginActions(GetExpression()));
   Save(REGISTER_CONTINUE);
   next = EvaluateSequence;
 }
 
 void EvaluateSequenceContinue() {
+  LOG("Evaluate next expression in sequence");
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_UNEVALUATED);
 
@@ -334,11 +379,13 @@ void EvaluateSequenceContinue() {
   next = EvaluateSequence;
 }
 void EvaluateSequenceLastExpression() {
+  LOG("Evaluate sequence, last expression");
   Restore(REGISTER_CONTINUE);
   next = EvaluateDispatch;
 }
 
 void EvaluateSequence() {
+  LOG("Evaluate sequence");
   Object unevaluated = GetUnevaluated();
   SetExpression(FirstExpression(unevaluated));
 
@@ -355,6 +402,7 @@ void EvaluateSequence() {
 }
 
 void EvaluateIfDecide() {
+  LOG("Evaluate if, condition already evaluated");
   Restore(REGISTER_CONTINUE);
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_EXPRESSION);
@@ -368,6 +416,7 @@ void EvaluateIfDecide() {
 }
 
 void EvaluateIf() {
+  LOG("Evaluate if");
   Save(REGISTER_EXPRESSION);
   Save(REGISTER_ENVIRONMENT);
   Save(REGISTER_CONTINUE);
@@ -378,6 +427,7 @@ void EvaluateIf() {
 
 
 void EvaluateAssignment1() {
+  LOG("Evaluate assignment, value already evaluated");
   Restore(REGISTER_CONTINUE);
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_UNEVALUATED);
@@ -392,6 +442,7 @@ void EvaluateAssignment1() {
 }
 
 void EvaluateAssignment() {
+  LOG("Evaluate assignment");
   SetUnevaluated(AssignmentVariable(GetExpression()));
   Save(REGISTER_UNEVALUATED);
 
@@ -443,8 +494,14 @@ void EvaluateDefinition() {
 }
 
 void EvaluateUnknown() {
+  LOG_ERROR("Unknown Expression");
   PrintlnObject(GetExpression());
-  assert(!"Unknown Expression");
+  next = EvaluateError;
+}
+
+void EvaluateError() {
+  LOG_ERROR("Error");
+  next = 0;
 }
 
 Object Second(Object list) { return Car(Cdr(list)); }
@@ -452,6 +509,9 @@ Object Third(Object list) { return Car(Cdr(Cdr(list))); }
 Object Fourth(Object list) { return Car(Cdr(Cdr(Cdr(list)))); }
 
 Object ApplyPrimitiveProcedure(Object procedure, Object arguments) { 
+  LOG("applying primitive function");
+  PrintlnObject(procedure);
+  PrintlnObject(arguments);
   PrimitiveFunction function = UnboxPrimitiveProcedure(procedure);
   return function(arguments);
 }
@@ -500,7 +560,7 @@ Object MakeProcedure() {
 }
 
 void TestEvaluate() {
-  InitializeMemory(128);
+  InitializeMemory(4096);
   InitializeSymbolTable(1);
   PrintlnObject(Evaluate(BoxFixnum(42)));
 
@@ -542,6 +602,10 @@ void TestEvaluate() {
   PrintlnObject(Evaluate(GetExpression()));
 
   ReadObject("(+ 720 360)", &success);
+  PrintlnObject(GetExpression());
+  PrintlnObject(Evaluate(GetExpression()));
+
+  ReadObject("(- (+ 720 360) 14)", &success);
   PrintlnObject(GetExpression());
   PrintlnObject(Evaluate(GetExpression()));
 
