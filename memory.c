@@ -101,7 +101,7 @@ Object MoveObject(Object object) {
 
 Object MovePrimitive(Object object) { return object; }
 
-void InitializeMemory(u64 max_objects) {
+void InitializeMemory(u64 max_objects, enum ErrorCode *error) {
   memory.max_objects = max_objects;
   memory.num_collections = 0;
   memory.num_objects_allocated = 0;
@@ -109,15 +109,23 @@ void InitializeMemory(u64 max_objects) {
   u64 n_bytes = sizeof(Object)*memory.max_objects;
 
   memory.the_objects = (Object*)malloc(n_bytes);
+  if (!memory.the_objects) {
+    *error = ERROR_COULD_NOT_ALLOCATE_HEAP;
+    return;
+  }
   assert(memory.the_objects);
 
   memory.new_objects = (Object*)malloc(n_bytes);
+  if (!memory.the_objects) {
+    *error = ERROR_COULD_NOT_ALLOCATE_HEAP_BUFFER;
+    return;
+  }
   assert(memory.new_objects);
 
   for (u64 i = 0; i < memory.max_objects; ++i) memory.the_objects[i] = nil;
   memory.free = 0;
 
-  InitializeRoot();
+  InitializeRoot(error);
 }
 
 void DestroyMemory() {
@@ -218,8 +226,8 @@ static Object MakePair(Object car, Object cdr, enum ErrorCode *error) {
 }
 
 void TestMemory() {
-  InitializeMemory(32);
   enum ErrorCode error = NO_ERROR;
+  InitializeMemory(32, &error);
   MakePair(BoxFixnum(4), BoxFixnum(2), &error);
   Object string = AllocateString("Hello", &error);
 

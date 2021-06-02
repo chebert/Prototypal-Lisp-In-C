@@ -31,16 +31,13 @@ Object Reverse(Object list);
 // Return the global symbol table
 Object GetSymbolTable();
 
-void InitializeSymbolTable(u64 size) {
-  SetRegister(REGISTER_SYMBOL_TABLE, MakeSymbolTable(size));
+void InitializeSymbolTable(u64 size, enum ErrorCode *error) {
+  SetRegister(REGISTER_SYMBOL_TABLE, MakeSymbolTable(size, error));
 }
 
 // A Symbol table is a Hashed set, represented as a vector of Symbol Lists
-Object MakeSymbolTable(u64 size) {
-  enum ErrorCode error = NO_ERROR;
-  Object table = AllocateVector(size, &error);
-  assert(!error);
-  return table;
+Object MakeSymbolTable(u64 size, enum ErrorCode *error) {
+  return AllocateVector(size, error);
 }
 
 
@@ -164,15 +161,15 @@ Object GetSymbolTable() {
 void TestSymbolTable() {
   assert(HashString("symbol") == 2905944654);
 
-  InitializeMemory(128);
-  InitializeSymbolTable(13);
+  enum ErrorCode error = NO_ERROR;
+  InitializeMemory(128, &error);
+  InitializeSymbolTable(13, &error);
 
   const u8 *symbol_name = "symbol";
 
   Object symbol = FindSymbol(symbol_name);
   assert(symbol == nil);
 
-  enum ErrorCode error = NO_ERROR;
   symbol = InternSymbol(symbol_name, &error);
   PrintlnObject(symbol);
 
@@ -185,8 +182,8 @@ void TestSymbolTable() {
   assert(FindSymbol(symbol_name) == nil);
 
   DestroyMemory();
-  InitializeMemory(128);
-  InitializeSymbolTable(1);
+  InitializeMemory(128, &error);
+  InitializeSymbolTable(1, &error);
   InternSymbol(symbol_name, &error);
   InternSymbol("dimple", &error);
   InternSymbol("pimple", &error);

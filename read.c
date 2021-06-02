@@ -279,9 +279,9 @@ b64 SymbolEq(Object symbol, const u8 *name) {
 }
 
 void TestRead() {
-  InitializeMemory(128);
-  InitializeSymbolTable(1);
   enum ErrorCode error = NO_ERROR;
+  InitializeMemory(128, &error);
+  InitializeSymbolTable(1, &error);
   InternSymbol("quote", &error);
 
   // Read string

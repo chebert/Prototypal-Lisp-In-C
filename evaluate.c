@@ -638,8 +638,8 @@ Object PrimitiveSubtractFixnumFixnum(Object arguments, enum ErrorCode *error) {
 }
 
 void TestEvaluate() {
-  InitializeMemory(128);
-  InitializeSymbolTable(1);
+  InitializeMemory(128, &error);
+  InitializeSymbolTable(1, &error);
 
   LOG_OP(LOG_TEST, PrintlnObject(Evaluate(BoxFixnum(42))));
 

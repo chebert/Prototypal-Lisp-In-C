@@ -7,10 +7,8 @@
 #include "symbol_table.h"
 #include "vector.h"
 
-void InitializeRoot() {
-  enum ErrorCode error = NO_ERROR;
-  memory.root = AllocateVector(NUM_REGISTERS, &error);
-  assert(!error);
+void InitializeRoot(enum ErrorCode *error) {
+  memory.root = AllocateVector(NUM_REGISTERS, error);
 }
 
 Object GetRegister(enum Register reg) {

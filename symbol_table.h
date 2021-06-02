@@ -10,10 +10,10 @@
 // for equality by testing to see if the references are equal, instead of a deep equality check.
 
 // Intialize the global symbol table.
-void InitializeSymbolTable(u64 size);
+void InitializeSymbolTable(u64 size, enum ErrorCode *error);
 
 u32 HashString(const u8 *str);
-Object MakeSymbolTable(u64 size);
+Object MakeSymbolTable(u64 size, enum ErrorCode *error);
 
 Object FindSymbol(const u8 *name);
 Object InternSymbol(const u8 *name, enum ErrorCode *error);

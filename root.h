@@ -7,7 +7,7 @@
 // At the root of memory is a vector of registers, holding all of the data/references
 // needed for the program.
 
-void InitializeRoot();
+void InitializeRoot(enum ErrorCode *error);
 
 enum Register {
   REGISTER_SYMBOL_TABLE,
