@@ -35,61 +35,50 @@ Object LookupVariableValue(Object variable, Object environment, b64 *found) {
   return First(values);
 }
 
-void SetVariableValue(Object variable, Object value, Object environment) {
+void SetVariableValue(Object variable, Object value, Object environment, enum ErrorCode *error) {
   Object values = LookupVariableReference(variable, environment);
-  assert(!IsNil(values));
+  if (IsNil(values)) {
+    *error = ERROR_EVALUATE_SET_UNBOUND_VARIABLE;
+    return;
+  }
   SetCar(values, value);
 }
 
-void DefineVariable() {
-  enum ErrorCode error = NO_ERROR;
+void DefineVariable(enum ErrorCode *error) {
   // Environment := (scope . more-scopes)
   // Scope       := (variables . values)
   {
-    Object new_variables = AllocatePair(&error);
-    if (error) {
-      // TODO: pass error up
-    } else {
-      SetCar(new_variables, GetUnevaluated());
-      Object inner_scope = InnerScope(GetEnvironment());
-      SetCdr(new_variables, ScopeVariables(inner_scope));
-      SetScopeVariables(inner_scope, new_variables);
-    }
+    Object new_variables = AllocatePair(error);
+    if (*error) return;
+    SetCar(new_variables, GetUnevaluated());
+    Object inner_scope = InnerScope(GetEnvironment());
+    SetCdr(new_variables, ScopeVariables(inner_scope));
+    SetScopeVariables(inner_scope, new_variables);
   }
   {
-    Object new_values = AllocatePair(&error);
-    if (error) {
-      // TODO: pass error up
-    } else {
-      SetCar(new_values, GetValue());
-      Object inner_scope = InnerScope(GetEnvironment());
-      SetCdr(new_values, ScopeValues(inner_scope));
-      SetScopeValues(inner_scope, new_values);
-    }
+    Object new_values = AllocatePair(error);
+    if (*error) return;
+    SetCar(new_values, GetValue());
+    Object inner_scope = InnerScope(GetEnvironment());
+    SetCdr(new_values, ScopeValues(inner_scope));
+    SetScopeValues(inner_scope, new_values);
   }
 }
 
-void ExtendEnvironment() {
-  enum ErrorCode error = NO_ERROR;
+void ExtendEnvironment(enum ErrorCode *error) {
   {
-    Object new_environment = AllocatePair(&error);
-    if (error) {
-      // TODO: pass error up
-    } else {
-      SetCdr(new_environment, GetEnvironment());
-      SetEnvironment(new_environment);
-    }
+    Object new_environment = AllocatePair(error);
+    if (*error) return;
+    SetCdr(new_environment, GetEnvironment());
+    SetEnvironment(new_environment);
   }
 
-  Object new_scope = AllocateScope(&error);
-  if (error) {
-    // TODO: pass error up
-  } else {
-    SetScopeVariables(new_scope, GetUnevaluated());
-    SetScopeValues(new_scope, GetArgumentList());
+  Object new_scope = AllocateScope(error);
+  if (*error) return;
+  SetScopeVariables(new_scope, GetUnevaluated());
+  SetScopeValues(new_scope, GetArgumentList());
 
-    SetInnerScope(GetEnvironment(), new_scope);
-  }
+  SetInnerScope(GetEnvironment(), new_scope);
 }
 
 void MakeInitialEnvironment() {

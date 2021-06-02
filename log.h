@@ -10,8 +10,8 @@ enum LogCategory {
   LOG_EVALUATE = 1 << 3,
 };
 
-//#define ENABLED_LOGS (LOG_TEST | LOG_MEMORY | LOG_READ | LOG_EVALUATE)
-#define ENABLED_LOGS (LOG_TEST | LOG_EVALUATE)
+#define ALL_LOGS (LOG_TEST | LOG_MEMORY | LOG_READ | LOG_EVALUATE)
+#define ENABLED_LOGS (LOG_TEST)
 
 void Log(const char *function, const char *file, int line, const char *fmt, ...);
 void LogError(const char *function, const char *file, int line, const char *fmt, ...);

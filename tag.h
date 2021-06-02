@@ -2,6 +2,7 @@
 #define TAG_H
 
 #include "c_types.h"
+#include "error.h"
 
 // A tagged Object is a 64-bit structure with a tag and a payload.
 // In this case, a technique called NAN-boxing is used. This means that
@@ -17,7 +18,7 @@
 // Objects are u64 so that we can easily perform bit manipulations.
 typedef u64      Object;
 
-typedef Object (*PrimitiveFunction)(Object arguments);
+typedef Object (*PrimitiveFunction)(Object arguments, enum ErrorCode *error);
 typedef void (*EvaluateFunction)();
 
 // Type Tags for Objects

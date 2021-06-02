@@ -66,7 +66,7 @@ Object LambdaParameters(Object expression);
 Object LambdaBody(Object expression);
 
 // Procedures
-Object ApplyPrimitiveProcedure(Object procedure, Object arguments);
+Object ApplyPrimitiveProcedure(Object procedure, Object arguments, enum ErrorCode *error);
 
 // Assignment
 Object AssignmentVariable(Object expression);
@@ -109,17 +109,8 @@ static EvaluateFunction next = 0;
 static enum ErrorCode error = NO_ERROR;
 
 // Primitives
-Object PrimitiveAddFixnumFixnum(Object arguments) {
-  Object a = First(arguments);
-  Object b = Second(arguments);
-  return BoxFixnum(UnboxFixnum(a) + UnboxFixnum(b));
-}
-
-Object PrimitiveSubtractFixnumFixnum(Object arguments) {
-  Object a = First(arguments);
-  Object b = Second(arguments);
-  return BoxFixnum(UnboxFixnum(a) - UnboxFixnum(b));
-}
+Object PrimitiveAddFixnumFixnum(Object arguments, enum ErrorCode *error);
+Object PrimitiveSubtractFixnumFixnum(Object arguments, enum ErrorCode *error);
 
 #define PRIMITIVES \
   X("+", PrimitiveAddFixnumFixnum) \
@@ -138,10 +129,12 @@ PrimitiveFunction primitives[] = {
 #define NUM_PRIMITIVES (sizeof(primitives) / sizeof(primitives[0]))
 
 void DefinePrimitive(const u8 *name, PrimitiveFunction function) {
+  enum ErrorCode error;
   SetUnevaluated(InternSymbol(name, &error));
   assert(!error);
   SetValue(BoxPrimitiveProcedure(function));
-  DefineVariable(REGISTER_UNEVALUATED, REGISTER_VALUE, REGISTER_ENVIRONMENT);
+  DefineVariable(&error);
+  assert(!error);
 }
 
 Object Evaluate(Object expression) {
@@ -373,7 +366,8 @@ void EvaluateApplicationDispatch() {
   Object proc = GetProcedure();
   if (IsPrimitiveProcedure(proc)) {
     // Primitive-procedure application
-    SetValue(ApplyPrimitiveProcedure(proc, GetArgumentList()));
+    SetValue(ApplyPrimitiveProcedure(proc, GetArgumentList(), &error));
+    CHECK(error);
     Restore(REGISTER_CONTINUE);
     next = GetContinue();
   } else if (IsCompoundProcedure(proc)) {
@@ -381,7 +375,8 @@ void EvaluateApplicationDispatch() {
     SetUnevaluated(ProcedureParameters(proc));
     SetEnvironment(ProcedureEnvironment(proc));
     LOG(LOG_EVALUATE, "Extending the environment");
-    ExtendEnvironment();
+    ExtendEnvironment(&error);
+    CHECK(error);
 
     proc = GetProcedure();
     SetUnevaluated(ProcedureBody(proc));
@@ -465,7 +460,9 @@ void EvaluateAssignment1() {
   SetVariableValue(
       GetUnevaluated(),
       GetValue(),
-      GetEnvironment());
+      GetEnvironment(),
+      &error);
+  CHECK(error);
   // Return the symbol 'ok as the result of an assignment
   SetValue(FindSymbol("ok"));
   next = GetContinue();
@@ -492,7 +489,8 @@ void EvaluateDefinition1() {
   LOG(LOG_EVALUATE, "Restored environment");
   Restore(REGISTER_UNEVALUATED);
   LOG(LOG_EVALUATE, "Restored unevaluated");
-  DefineVariable();
+  DefineVariable(&error);
+  CHECK(error);
   LOG(LOG_EVALUATE, "defining variable");
   LOG_OP(LOG_EVALUATE, PrintlnObject(GetEnvironment()));
   // Return the symbol name as the result of the definition.
@@ -539,12 +537,12 @@ Object Second(Object list) { return Car(Cdr(list)); }
 Object Third(Object list) { return Car(Cdr(Cdr(list))); }
 Object Fourth(Object list) { return Car(Cdr(Cdr(Cdr(list)))); }
 
-Object ApplyPrimitiveProcedure(Object procedure, Object arguments) { 
+Object ApplyPrimitiveProcedure(Object procedure, Object arguments, enum ErrorCode *error) { 
   LOG(LOG_EVALUATE, "applying primitive function");
   LOG_OP(LOG_EVALUATE, PrintlnObject(procedure));
   LOG_OP(LOG_EVALUATE, PrintlnObject(arguments));
   PrimitiveFunction function = UnboxPrimitiveProcedure(procedure);
-  return function(arguments);
+  return function(arguments, error);
 }
 
 // Lambda: (lambda (parameters...) . body...)
@@ -590,6 +588,53 @@ Object MakeProcedure(enum ErrorCode *error) {
   SetProcedureParameters(procedure, GetUnevaluated());
   SetProcedureBody(procedure, GetExpression());
   return procedure;
+}
+
+Object PrimitiveAddFixnumFixnum(Object arguments, enum ErrorCode *error) {
+  if (IsNil(arguments)) {
+    *error = ERROR_EVALUATE_ARITY_MISMATCH;
+    return nil;
+  }
+  Object a = First(arguments);
+  if (!IsFixnum(a)) {
+    *error = ERROR_EVALUATE_INVALID_ARGUMENT_TYPE;
+    return nil;
+  }
+  arguments = Rest(arguments);
+  if (IsNil(arguments)) {
+    *error = ERROR_EVALUATE_ARITY_MISMATCH;
+    return nil;
+  }
+  Object b = First(arguments);
+  if (!IsFixnum(b)) {
+    *error = ERROR_EVALUATE_INVALID_ARGUMENT_TYPE;
+    return nil;
+  }
+
+  return BoxFixnum(UnboxFixnum(a) + UnboxFixnum(b));
+}
+
+Object PrimitiveSubtractFixnumFixnum(Object arguments, enum ErrorCode *error) {
+  if (IsNil(arguments)) {
+    *error = ERROR_EVALUATE_ARITY_MISMATCH;
+    return nil;
+  }
+  Object a = First(arguments);
+  if (!IsFixnum(a)) {
+    *error = ERROR_EVALUATE_INVALID_ARGUMENT_TYPE;
+    return nil;
+  }
+  arguments = Rest(arguments);
+  if (IsNil(arguments)) {
+    *error = ERROR_EVALUATE_ARITY_MISMATCH;
+    return nil;
+  }
+  Object b = First(arguments);
+  if (!IsFixnum(b)) {
+    *error = ERROR_EVALUATE_INVALID_ARGUMENT_TYPE;
+    return nil;
+  }
+  return BoxFixnum(UnboxFixnum(a) - UnboxFixnum(b));
 }
 
 void TestEvaluate() {
@@ -639,6 +684,14 @@ void TestEvaluate() {
   LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
 
   ReadObject("(- (+ 720 360) 14)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
+  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+
+  ReadObject("(- \"hello\" 14)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
+  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+
+  ReadObject("(- 14)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
   LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
 
