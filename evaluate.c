@@ -83,7 +83,7 @@ Object IfAlternative(Object expression);
 b64 IsTruthy(Object condition);
 
 // Application
-enum ErrorCode AdjoinArgument();
+void AdjoinArgument(enum ErrorCode *error);
 
 Object Operands(Object application);
 Object Operator(Object application);
@@ -109,6 +109,7 @@ b64 IsLastExpression(Object sequence);
   } while(0);
 
 static EvaluateFunction next;
+static enum ErrorCode error;
 
 // Primitives
 Object PrimitiveAddFixnumFixnum(Object arguments) {
@@ -140,7 +141,6 @@ PrimitiveFunction primitives[] = {
 #define NUM_PRIMITIVES (sizeof(primitives) / sizeof(primitives[0]))
 
 void DefinePrimitive(const u8 *name, PrimitiveFunction function) {
-  enum ErrorCode error;
   SetUnevaluated(InternSymbol(name, &error));
   assert(!error);
   SetValue(BoxPrimitiveProcedure(function));
@@ -156,7 +156,6 @@ Object Evaluate(Object expression) {
 
   // Ensure that the evaluator can find all the necessary symbols.
   // to avoid allocating during EvaluateDispatch.
-  enum ErrorCode error;
   InternSymbol("quote", &error);
   InternSymbol("set!", &error);
   InternSymbol("define", &error);
@@ -271,7 +270,6 @@ void EvaluateLambda() {
   SetExpression(LambdaBody(expression));
   LOG("Lambda body: ");
   PrintlnObject(GetExpression());
-  enum ErrorCode error;
   SetValue(MakeProcedure(&error));
   if (error) {
     next = EvaluateError;
@@ -283,7 +281,6 @@ void EvaluateLambda() {
 void EvaluateApplication() {
   LOG("Application");
   Object expression = GetExpression();
-  enum ErrorCode error;
   SAVE(REGISTER_CONTINUE, error);
   SAVE(REGISTER_ENVIRONMENT, error);
   SetUnevaluated(Operands(expression));
@@ -310,7 +307,6 @@ void EvaluateApplicationOperands() {
     next = EvaluateApplicationDispatch;
   } else {
     // CASE: 1 or more operands
-    enum ErrorCode error;
     SAVE(REGISTER_PROCEDURE, error);
     next = EvaluateApplicationOperandLoop;
   }
@@ -327,17 +323,12 @@ Object SetLastCdr(Object list, Object last_pair) {
   return head;
 }
 
-enum ErrorCode AdjoinArgument() {
-  enum ErrorCode error;
-  Object last_pair = AllocatePair(&error);
-  if (error) {
-    LOG_ERROR("Could not allocate pair for new argument");
-    return error;
-  }
+void AdjoinArgument(enum ErrorCode *error) {
+  Object last_pair = AllocatePair(error);
+  if (*error) return;
 
   SetCar(last_pair, GetValue());
   SetArgumentList(SetLastCdr(GetArgumentList(), last_pair));
-  return error;
 }
 
 void EvaluateApplicationAccumulateArgument() {
@@ -345,7 +336,7 @@ void EvaluateApplicationAccumulateArgument() {
   Restore(REGISTER_UNEVALUATED);
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_ARGUMENT_LIST);
-  enum ErrorCode error = AdjoinArgument();
+  AdjoinArgument(&error);
   if (error) {
     LOG_ERROR("Could not adjoin argument");
     next = EvaluateError;
@@ -358,7 +349,7 @@ void EvaluateApplicationAccumulateArgument() {
 void EvaluateApplicationAccumulateLastArgument() {
   LOG("Accumulating last argument");
   Restore(REGISTER_ARGUMENT_LIST);
-  enum ErrorCode error = AdjoinArgument();
+  AdjoinArgument(&error);
   if (error) {
     LOG_ERROR("Could not adjoin argument");
     next = EvaluateError;
@@ -377,7 +368,6 @@ void EvaluateApplicationLastOperand() {
 void EvaluateApplicationOperandLoop() {
   LOG("Evaluating next operand");
   // Evaluate operands
-  enum ErrorCode error;
   SAVE(REGISTER_ARGUMENT_LIST, error);
 
   SetExpression(FirstOperand(GetUnevaluated()));
@@ -422,7 +412,6 @@ void EvaluateApplicationDispatch() {
 void EvaluateBegin() {
   LOG("Evaluate begin");
   SetUnevaluated(BeginActions(GetExpression()));
-  enum ErrorCode error;
   SAVE(REGISTER_CONTINUE, error);
   next = EvaluateSequence;
 }
@@ -452,7 +441,6 @@ void EvaluateSequence() {
     next = EvaluateSequenceLastExpression;
   } else {
     // Case: 2+ expressions left to evaluate
-    enum ErrorCode error;
     SAVE(REGISTER_UNEVALUATED, error);
     SAVE(REGISTER_ENVIRONMENT, error);
     SetContinue(EvaluateSequenceContinue);
@@ -476,7 +464,6 @@ void EvaluateIfDecide() {
 
 void EvaluateIf() {
   LOG("Evaluate if");
-  enum ErrorCode error;
   SAVE(REGISTER_EXPRESSION, error);
   SAVE(REGISTER_ENVIRONMENT, error);
   SAVE(REGISTER_CONTINUE, error);
@@ -504,7 +491,6 @@ void EvaluateAssignment1() {
 void EvaluateAssignment() {
   LOG("Evaluate assignment");
   SetUnevaluated(AssignmentVariable(GetExpression()));
-  enum ErrorCode error;
   SAVE(REGISTER_UNEVALUATED, error);
 
   SetExpression(AssignmentValue(GetExpression()));
@@ -535,7 +521,6 @@ void EvaluateDefinition1() {
 
 void EvaluateDefinition() {
   SetUnevaluated(DefinitionVariable(GetExpression()));
-  enum ErrorCode error;
   SAVE(REGISTER_UNEVALUATED, error);
 
   LOG("Setting, then saving Unevaluated:");
@@ -562,7 +547,7 @@ void EvaluateUnknown() {
 }
 
 void EvaluateError() {
-  LOG_ERROR("Error occurred.");
+  LOG_ERROR("%s", ErrorCodeString(error));
   next = 0;
 }
 
@@ -629,7 +614,6 @@ void TestEvaluate() {
 
   PrintlnObject(Evaluate(BoxFixnum(42)));
 
-  enum ErrorCode error;
   ReadObject("'(hello world)", &error);
   PrintlnObject(GetExpression());
   PrintlnObject(Evaluate(GetExpression()));
