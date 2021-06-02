@@ -75,8 +75,21 @@ Object Rest(Object pair) { return Cdr(pair); }
 void PrintPair(Object pair) {
   u64 reference = UnboxReference(pair);
   printf("(");
-  PrintObject(memory.the_objects[reference]);
-  printf(" . ");
-  PrintObject(memory.the_objects[reference+1]);
-  printf(")");
+  PrintObject(Car(pair));
+
+  Object rest = Cdr(pair);
+  if (IsPair(rest)) {
+    for (; IsPair(rest); rest = Cdr(rest)) {
+      printf(" ");
+      PrintObject(Car(rest));
+    }
+  }
+
+  if (IsNil(rest)) {
+    printf(")");
+  } else {
+    printf(" . ");
+    PrintObject(rest);
+    printf(")");
+  }
 }

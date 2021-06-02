@@ -81,16 +81,10 @@ void ExtendEnvironment(enum ErrorCode *error) {
   SetInnerScope(GetEnvironment(), new_scope);
 }
 
-void MakeInitialEnvironment() {
-  enum ErrorCode error = NO_ERROR;
-  SetEnvironment(AllocatePair(&error));
-  if (error) {
-    assert(!"Could not allocate initial environment");
-  }
-  SetInnerScope(GetEnvironment(), AllocateScope(&error));
-  if (error) {
-    assert(!"Could not allocate global scope");
-  }
+void MakeInitialEnvironment(enum ErrorCode *error) {
+  SetEnvironment(AllocatePair(error));
+  if (*error) return; 
+  SetInnerScope(GetEnvironment(), AllocateScope(error));
 }
 
 Object LookupVariableReference(Object variable, Object environment) {
@@ -106,7 +100,7 @@ Object LookupVariableInScope(Object variable, Object scope) {
   Object variables = ScopeVariables(scope);
   Object values = ScopeValues(scope);
 
-  for (; !IsNil(variables); variables = Cdr(variables), values = Cdr(values)) {
+  for (; IsPair(variables); variables = Cdr(variables), values = Cdr(values)) {
     if (!strcmp(StringCharacterBuffer(variable), StringCharacterBuffer(Car(variables)))) {
       return values;
     }

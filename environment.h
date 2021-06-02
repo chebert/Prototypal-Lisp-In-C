@@ -25,6 +25,6 @@ void DefineVariable(enum ErrorCode *error);
 void ExtendEnvironment(enum ErrorCode *error);
 
 // Creates the initial environment. Crashes if there isn't enough memory.
-void MakeInitialEnvironment();
+void MakeInitialEnvironment(enum ErrorCode *error);
 
 #endif

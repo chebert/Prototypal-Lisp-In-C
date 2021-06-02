@@ -155,7 +155,7 @@ Object Evaluate(Object expression) {
   InternSymbol("ok", &error);
 
   // Create the initial environment
-  MakeInitialEnvironment();
+  MakeInitialEnvironment(&error);
 
   // Add primitive functions to the initial environment
   for (int i = 0; i < NUM_PRIMITIVES; ++i)
