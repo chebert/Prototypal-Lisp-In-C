@@ -55,7 +55,7 @@ void EvaluateDefinition1();
 
 void EvaluateError();
 
-static Object MakeProcedure();
+static Object MakeProcedure(enum ErrorCode *error);
 
 Object Second(Object list);
 Object Third(Object list);
@@ -271,8 +271,13 @@ void EvaluateLambda() {
   SetExpression(LambdaBody(expression));
   LOG("Lambda body: ");
   PrintlnObject(GetExpression());
-  SetValue(MakeProcedure());
-  next = GetContinue();
+  enum ErrorCode error;
+  SetValue(MakeProcedure(&error));
+  if (error) {
+    next = EvaluateError;
+  } else {
+    next = GetContinue();
+  }
 }
 
 void EvaluateApplication() {
@@ -608,8 +613,10 @@ Object FirstExpression(Object sequence)  { return First(sequence); }
 Object RestExpressions(Object sequence)  { return Rest(sequence); }
 b64    IsLastExpression(Object sequence) { return Rest(sequence) == nil; }
 
-Object MakeProcedure() {
-  Object procedure = AllocateCompoundProcedure();
+Object MakeProcedure(enum ErrorCode *error) {
+  Object procedure = AllocateCompoundProcedure(error);
+  if (*error) return nil;
+
   SetProcedureEnvironment(procedure, GetEnvironment());
   SetProcedureParameters(procedure, GetUnevaluated());
   SetProcedureBody(procedure, GetExpression());

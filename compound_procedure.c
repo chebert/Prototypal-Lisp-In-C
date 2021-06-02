@@ -7,12 +7,9 @@
 #include "memory.h"
 #include "tag.h"
 
-Object AllocateCompoundProcedure() {
-  enum ErrorCode error = EnsureEnoughMemory(3);
-  if (error) {
-    // TODO
-    return nil;
-  }
+Object AllocateCompoundProcedure(enum ErrorCode *error) {
+  *error = EnsureEnoughMemory(3);
+  if (*error) return nil;
 
   // [ ..., free.. ]
   u64 new_reference = memory.free;

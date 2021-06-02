@@ -1,6 +1,7 @@
 #ifndef COMPOUND_PROCEDURE_H
 #define COMPOUND_PROCEDURE_H
 
+#include "error.h"
 #include "tag.h"
 
 // A compound procedure type representing 3 associated Objects.
@@ -9,7 +10,7 @@
 // A compound procedure object is a reference to this tuple.
 
 // Allocate a triple representing a compound procedure.
-Object AllocateCompoundProcedure();
+Object AllocateCompoundProcedure(enum ErrorCode *error);
 // Move a compound procedure from the_objects to new_objects
 Object MoveCompoundProcedure(Object procedure);
 
