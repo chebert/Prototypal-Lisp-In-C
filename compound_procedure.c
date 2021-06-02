@@ -28,16 +28,16 @@ Object MoveCompoundProcedure(Object procedure) {
   //      [ ..., <BH new>, ... ]
   u64 new_reference = memory.free;
 
-  LOG("moving from %llu in the_objects to %llu in new_objects\n", ref, new_reference);
+  LOG(LOG_MEMORY, "moving from %llu in the_objects to %llu in new_objects\n", ref, new_reference);
   Object old_environment = memory.the_objects[ref];
   if (IsBrokenHeart(old_environment)) {
     // The procedure has already been moved. Return the updated reference.
     // Old: [ ..., <BH new>, ... ]
-    LOG("old_environment is a broken heart pointing to %llu\n", UnboxReference(old_environment));
+    LOG(LOG_MEMORY, "old_environment is a broken heart pointing to %llu\n", UnboxReference(old_environment));
     return BoxCompoundProcedure(UnboxReference(old_environment));
   }
 
-  LOG("Moving from the_objects to new_objects, leaving a broken heart at %llu pointing to %llu\n", ref, new_reference);
+  LOG(LOG_MEMORY, "Moving from the_objects to new_objects, leaving a broken heart at %llu pointing to %llu\n", ref, new_reference);
   Object moved_procedure = BoxCompoundProcedure(new_reference);
   // Old: [ ..., environment, parameters, body, ... ]
   memory.new_objects[memory.free++] = old_environment; // environment

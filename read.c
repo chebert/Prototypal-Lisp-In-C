@@ -101,33 +101,36 @@ Object ProcessSingleToken(const struct Token *token, enum ErrorCode *error) {
   Object object = nil;
   if (token->type == TOKEN_INTEGER) {
     s64 value;
-    sscanf(data, "%lld", &value);
-    object = BoxFixnum(value);
+    if (!sscanf(data, "%lld", &value)) {
+      *error = ERROR_READ_INVALID_INTEGER;
+      object = nil;
+    } else {
+      object = BoxFixnum(value);
+    }
   } else if (token->type == TOKEN_REAL32) {
     real32 value;
-    sscanf(data, "%f", &value);
-    object = BoxReal32(value);
+    if (!sscanf(data, "%f", &value)) {
+      *error = ERROR_READ_INVALID_REAL32;
+      object = nil;
+    } else  {
+      object = BoxReal32(value);
+    }
   } else if (token->type == TOKEN_REAL64) {
     real64 value;
-    sscanf(data, "%lf", &value);
-    object = BoxReal64(value);
+    if (!sscanf(data, "%lf", &value)) {
+      *error = ERROR_READ_INVALID_REAL64;
+      object = nil;
+    } else {
+      object = BoxReal64(value);
+    }
   } else if (token->type == TOKEN_STRING) {
     object = AllocateString(data, error);
     // REFERENCES INVALIDATED
-    if (*error) {
-      free(data);
-      return nil;
-    }
   } else if (token->type == TOKEN_SYMBOL) {
     object = InternSymbol(data, error);
     // REFERENCES INVALIDATED
-    if (*error) {
-      free(data);
-      return nil;
-    }
   }
   free(data);
-  *error = NO_ERROR;
   return object;
 }
 
@@ -181,8 +184,8 @@ const u8 *ReadNextListObject(const struct Token *token, const u8 *source, enum E
   // (a b c d)
   //    ^-here
   source = ReadNextObjectFromToken(token, source, error);
-  LOG("Read in ");
-  PrintlnObject(GetRegister(REGISTER_EXPRESSION));
+  LOG(LOG_READ, "Read in ");
+  LOG_OP(LOG_READ, PrintlnObject(GetRegister(REGISTER_EXPRESSION)));
   if (*error) return source;
   // (a b c d)
   //     ^-here
@@ -190,28 +193,28 @@ const u8 *ReadNextListObject(const struct Token *token, const u8 *source, enum E
   PushReadResultOntoStack(error);
   if (*error) return source;
 
-  LOG("pushing it onto the read stack: ");
-  PrintlnObject(GetRegister(REGISTER_READ_STACK));
+  LOG(LOG_READ, "pushing it onto the read stack: ");
+  LOG_OP(LOG_READ, PrintlnObject(GetRegister(REGISTER_READ_STACK)));
   
   // stack: ((b . nil) (a . nil))
   source = ContinueReadList(source, error);
   if (*error) return source;
   // (a b c d)
   //          ^-here
-  LOG("Read the rest of the list: ");
-  PrintlnObject(GetRegister(REGISTER_EXPRESSION));
+  LOG(LOG_READ, "Read the rest of the list: ");
+  LOG_OP(LOG_READ, PrintlnObject(GetRegister(REGISTER_EXPRESSION)));
 
   // stack: ((b . nil) (a . nil))
   // read result: (c . (d . nil))
   Object pair = PopReadStack();
-  LOG("popping the read stack: ");
-  PrintlnObject(GetRegister(REGISTER_READ_STACK));
+  LOG(LOG_READ, "popping the read stack: ");
+  LOG_OP(LOG_READ, PrintlnObject(GetRegister(REGISTER_READ_STACK)));
 
   // stack: ((a . nil))
   SetCdr(pair, GetRegister(REGISTER_EXPRESSION));
   SetRegister(REGISTER_EXPRESSION, pair);
-  LOG("setting the read result: ");
-  PrintlnObject(GetRegister(REGISTER_EXPRESSION));
+  LOG(LOG_READ, "setting the read result: ");
+  LOG_OP(LOG_READ, PrintlnObject(GetRegister(REGISTER_EXPRESSION)));
   // stack: ((a . nil))
   // read result: (b . (c . nil))
   return source;

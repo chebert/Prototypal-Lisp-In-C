@@ -31,16 +31,16 @@ Object MovePair(Object pair) {
   //      [ ..., <BH new>, ... ]
   u64 new_reference = memory.free;
 
-  LOG("moving from %llu in the_objects to %llu in new_objects\n", ref, new_reference);
+  LOG(LOG_MEMORY, "moving from %llu in the_objects to %llu in new_objects\n", ref, new_reference);
   Object old_car = memory.the_objects[ref];
   if (IsBrokenHeart(old_car)) {
     // The pair has already been moved. Return the updated reference.
     // Old: [ ..., <BH new>, ... ]
-    LOG("old_car is a broken heart pointing to %llu\n", UnboxReference(old_car));
+    LOG(LOG_MEMORY, "old_car is a broken heart pointing to %llu\n", UnboxReference(old_car));
     return BoxPair(UnboxReference(old_car));
   }
 
-  LOG("Moving from the_objects to new_objects, leaving a broken heart at %llu pointing to %llu\n", ref, new_reference);
+  LOG(LOG_MEMORY, "Moving from the_objects to new_objects, leaving a broken heart at %llu pointing to %llu\n", ref, new_reference);
   Object moved_pair = BoxPair(new_reference);
   // Old: [ ..., car, cdr, ... ]
   memory.new_objects[memory.free++] = old_car;

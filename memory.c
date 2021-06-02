@@ -23,38 +23,39 @@ Object MovePrimitive(Object object);
 
 // Print an object, not following references.
 void PrintReference(Object object);
+void PrintlnReference(Object object);
 
 // Global memory storage
 struct Memory memory;
 
 void CollectGarbage() {
   ++memory.num_collections;
-  LOG("Beginning a garbage collection number %d\n", memory.num_collections);
+  LOG(LOG_MEMORY, "Beginning a garbage collection number %d\n", memory.num_collections);
   // DEBUGGING: Clear unused objects to nil
   for (u64 i = 0; i < memory.max_objects; ++i) memory.new_objects[i] = nil;
-  LOG("resetting the free pointer to 0\n");
+  LOG(LOG_MEMORY, "resetting the free pointer to 0\n");
 
   // Reset the free pointer to the start of the new_objects
   memory.free = 0;
 
   // Move the root from the_objects to new_objects.
-  LOG("Moving the root object: ");
-  PrintlnObject(memory.root);
+  LOG(LOG_MEMORY, "Moving the root object: ");
+  LOG_OP(LOG_MEMORY, PrintlnObject(memory.root));
   memory.root = MoveObject(memory.root);
 
-  LOG("Moved root. Free=%llu Beginning scan.\n", memory.free);
+  LOG(LOG_MEMORY, "Moved root. Free=%llu Beginning scan.\n", memory.free);
   // Scan over the freshly moved objects
   //  if a reference to an old object is encountered, move it
   // when scan catches up to free, the entire memory has been scanned/moved.
   for (u64 scan = 0; scan < memory.free;) {
-    LOG("Scanning object at %llu. Free=%llu\n", scan, memory.free);
+    LOG(LOG_MEMORY, "Scanning object at %llu. Free=%llu\n", scan, memory.free);
     Object object = memory.new_objects[scan];
 
     // If the object is a blob, we can't scan its contents
     if (IsBlobHeader(object)) {
       u64 num_objects = NumObjectsPerBlob(UnboxBlobHeader(object));
       scan += num_objects;
-      LOG("Encountered blob of size %llu objects. Scan=%llu\n", num_objects, scan);
+      LOG(LOG_MEMORY, "Encountered blob of size %llu objects. Scan=%llu\n", num_objects, scan);
     } else {
       memory.new_objects[scan] = MoveObject(object);
       ++scan;
@@ -70,9 +71,8 @@ void CollectGarbage() {
 
 
 Object MoveObject(Object object) {
-  LOG("moving object: ");
-  PrintReference(object);
-  printf("\n");
+  LOG(LOG_MEMORY, "moving object: ");
+  LOG_OP(LOG_MEMORY, PrintlnReference(object));
   // If it isn't tagged, it's a double float.
   if (!IsTagged(object)) {
     return MovePrimitive(object);
@@ -168,6 +168,11 @@ void PrintlnObject(Object object) {
   printf("\n");
 }
 
+void PrintlnReference(Object object) {
+  PrintReference(object);
+  printf("\n");
+}
+
 void PrintReference(Object object) {
   if (IsReal64(object)) {
     printf("%llf", UnboxReal64(object));
@@ -203,10 +208,9 @@ void PrintMemory() {
 }
 
 // Unsafe, only for testing
-static Object MakePair(Object car, Object cdr) {
-  enum ErrorCode error = NO_ERROR;
-  Object pair = AllocatePair(&error);
-  assert(!error);
+static Object MakePair(Object car, Object cdr, enum ErrorCode *error) {
+  Object pair = AllocatePair(error);
+  assert(!*error);
   // REFERENCES INVALIDATED
   SetCar(pair, car);
   SetCdr(pair, cdr);
@@ -215,8 +219,8 @@ static Object MakePair(Object car, Object cdr) {
 
 void TestMemory() {
   InitializeMemory(32);
-  MakePair(BoxFixnum(4), BoxFixnum(2));
   enum ErrorCode error = NO_ERROR;
+  MakePair(BoxFixnum(4), BoxFixnum(2), &error);
   Object string = AllocateString("Hello", &error);
 
   Object vector = AllocateVector(3, &error);
@@ -230,24 +234,24 @@ void TestMemory() {
   ByteVectorSet(byte_vector, 2, 0xf, &error);
   ByteVectorSet(byte_vector, 3, 0xe, &error);
 
-  Object shared = MakePair(byte_vector, string);
-  SetRegister(REGISTER_EXPRESSION, MakePair(shared, MakePair(shared, vector)));
+  Object shared = MakePair(byte_vector, string, &error);
+  SetRegister(REGISTER_EXPRESSION, MakePair(shared, MakePair(shared, vector, &error), &error));
 
-  LOG("Old Root: ");
-  PrintlnObject(GetRegister(REGISTER_EXPRESSION));
-  PrintMemory();
+  LOG(LOG_TEST, "Old Root: ");
+  LOG_OP(LOG_TEST, PrintlnObject(GetRegister(REGISTER_EXPRESSION)));
+  LOG_OP(LOG_TEST, PrintMemory());
   CollectGarbage();
 
-  LOG("New Root: ");
-  PrintlnObject(GetRegister(REGISTER_EXPRESSION));
-  PrintMemory();
+  LOG(LOG_TEST, "New Root: ");
+  LOG_OP(LOG_TEST, PrintlnObject(GetRegister(REGISTER_EXPRESSION)));
+  LOG_OP(LOG_TEST, PrintMemory());
 
   for (int i = 0; i < 1000; ++i) {
-    MakePair(BoxFixnum(0), BoxFixnum(1));
+    MakePair(BoxFixnum(0), BoxFixnum(1), &error);
   }
-  LOG("Root: ");
-  PrintlnObject(GetRegister(REGISTER_EXPRESSION));
-  LOG("Allocated %llu objects, performed %llu garbage collections, moved %llu objects,\n"
+  LOG(LOG_TEST, "Root: ");
+  LOG_OP(LOG_TEST, PrintlnObject(GetRegister(REGISTER_EXPRESSION)));
+  LOG(LOG_TEST, "Allocated %llu objects, performed %llu garbage collections, moved %llu objects,\n"
       "on average: %llf objects allocated/collection, %llf objects moved/collection\n",
       memory.num_objects_allocated, memory.num_collections, memory.num_objects_moved,
       memory.num_objects_allocated * 1.0 / memory.num_collections,
@@ -255,7 +259,7 @@ void TestMemory() {
 
   SetRegister(REGISTER_EXPRESSION, nil);
   SetRegister(REGISTER_EXPRESSION, AllocateVector(30 - NUM_REGISTERS, &error));
-  LOG("Root: ");
-  PrintlnObject(GetRegister(REGISTER_EXPRESSION));
+  LOG(LOG_TEST, "Root: ");
+  LOG_OP(LOG_TEST, PrintlnObject(GetRegister(REGISTER_EXPRESSION)));
   DestroyMemory();
 }
