@@ -109,12 +109,16 @@ static EvaluateFunction next = 0;
 static enum ErrorCode error = NO_ERROR;
 
 // Primitives
-Object PrimitiveAddFixnumFixnum(Object arguments, enum ErrorCode *error);
-Object PrimitiveSubtractFixnumFixnum(Object arguments, enum ErrorCode *error);
+Object PrimitiveUnaryAdd(Object arguments, enum ErrorCode *error);
+Object PrimitiveBinaryAdd(Object arguments, enum ErrorCode *error);
+Object PrimitiveUnarySubtract(Object arguments, enum ErrorCode *error);
+Object PrimitiveBinarySubtract(Object arguments, enum ErrorCode *error);
 
 #define PRIMITIVES \
-  X("+", PrimitiveAddFixnumFixnum) \
-  X("-", PrimitiveSubtractFixnumFixnum)
+  X("+:unary", PrimitiveUnaryAdd) \
+  X("+:binary", PrimitiveBinaryAdd) \
+  X("-:unary", PrimitiveUnarySubtract) \
+  X("-:binary", PrimitiveBinarySubtract)
 
 const u8 *primitive_names[] = {
 #define X(name, function) name,
@@ -591,7 +595,7 @@ Object MakeProcedure(enum ErrorCode *error) {
 
 // Remove one argument from arguments, and assigning it to result.
 // If there are no more arguments in arguments, error is set, and nil is returned.
-#define EXTRACT(arguments, result, error) \
+#define EXTRACT_ARGUMENT(arguments, result, error) \
   do { \
     if (IsNil(arguments)) { \
       *error = ERROR_EVALUATE_ARITY_MISMATCH; \
@@ -599,6 +603,14 @@ Object MakeProcedure(enum ErrorCode *error) {
     } \
     result = First(arguments); \
     arguments = Rest(arguments); \
+  } while (0)
+
+#define CHECK_NO_MORE_ARGUMENTS(arguments, error) \
+  do { \
+    if (!IsNil(arguments)) { \
+      *error = ERROR_EVALUATE_ARITY_MISMATCH; \
+      return nil; \
+    } \
   } while (0)
 
 // Performs the type test. If the type is invalid, the error is set and nil is returned.
@@ -610,29 +622,71 @@ Object MakeProcedure(enum ErrorCode *error) {
     } \
   } while (0)
 
-// Extracts one argument and checks its type. Sets the error/returns if an error occurs.
-#define EXTRACT_TYPE(arguments, type_predicate, result, error) \
-  do { \
-    EXTRACT(arguments, result, error); \
-    CHECK_TYPE(type_predicate(result), error); \
-  } while (0)
+Object PrimitiveUnaryAdd(Object arguments, enum ErrorCode *error) {
+  Object a;
+  EXTRACT_ARGUMENT(arguments, a, error);
+  CHECK_NO_MORE_ARGUMENTS(arguments, error);
 
-Object PrimitiveAddFixnumFixnum(Object arguments, enum ErrorCode *error) {
-  Object a, b;
-  EXTRACT_TYPE(arguments, IsFixnum, a, error);
-  EXTRACT_TYPE(arguments, IsFixnum, b, error);
-  return BoxFixnum(UnboxFixnum(a) + UnboxFixnum(b));
+  if (IsFixnum(a) || IsReal64(a))
+    return a;
+  *error = ERROR_EVALUATE_INVALID_ARGUMENT_TYPE;
+  return nil;
 }
 
-Object PrimitiveSubtractFixnumFixnum(Object arguments, enum ErrorCode *error) {
+Object PrimitiveBinaryAdd(Object arguments, enum ErrorCode *error) {
   Object a, b;
-  EXTRACT_TYPE(arguments, IsFixnum, a, error);
-  EXTRACT_TYPE(arguments, IsFixnum, b, error);
-  return BoxFixnum(UnboxFixnum(a) - UnboxFixnum(b));
+  EXTRACT_ARGUMENT(arguments, a, error);
+  EXTRACT_ARGUMENT(arguments, b, error);
+  CHECK_NO_MORE_ARGUMENTS(arguments, error);
+
+  if (IsFixnum(a)) {
+    s64 aval = UnboxFixnum(a);
+    if      (IsFixnum(b)) return BoxFixnum(aval + UnboxFixnum(b));
+    else if (IsReal64(b)) return BoxReal64(aval + UnboxReal64(b));
+  } else if (IsReal64(a)) {
+    real64 aval = UnboxReal64(a);
+    if      (IsFixnum(b)) return BoxReal64(aval + UnboxFixnum(b));
+    else if (IsReal64(b)) return BoxReal64(aval + UnboxReal64(b));
+  }
+  *error = ERROR_EVALUATE_INVALID_ARGUMENT_TYPE;
+  return nil;
+}
+
+Object PrimitiveUnarySubtract(Object arguments, enum ErrorCode *error) {
+  Object a;
+  EXTRACT_ARGUMENT(arguments, a, error);
+  CHECK_NO_MORE_ARGUMENTS(arguments, error);
+
+  if (IsFixnum(a))
+    return BoxFixnum(-UnboxFixnum(a));
+  else if (IsReal64(a)) // TODO worry about negative NAN's here I think.
+    return BoxReal64(-UnboxReal64(a));
+
+  *error = ERROR_EVALUATE_INVALID_ARGUMENT_TYPE;
+  return nil;
+}
+
+Object PrimitiveBinarySubtract(Object arguments, enum ErrorCode *error) {
+  Object a, b;
+  EXTRACT_ARGUMENT(arguments, a, error);
+  EXTRACT_ARGUMENT(arguments, b, error);
+  CHECK_NO_MORE_ARGUMENTS(arguments, error);
+
+  if (IsFixnum(a)) {
+    s64 aval = UnboxFixnum(a);
+    if      (IsFixnum(b)) return BoxFixnum(aval - UnboxFixnum(b));
+    else if (IsReal64(b)) return BoxReal64(aval - UnboxReal64(b));
+  } else if (IsReal64(a)) {
+    real64 aval = UnboxReal64(a);
+    if      (IsFixnum(b)) return BoxReal64(aval - UnboxFixnum(b));
+    else if (IsReal64(b)) return BoxReal64(aval - UnboxReal64(b));
+  }
+  *error = ERROR_EVALUATE_INVALID_ARGUMENT_TYPE;
+  return nil;
 }
 
 void TestEvaluate() {
-  InitializeMemory(128, &error);
+  InitializeMemory(256, &error);
   InitializeSymbolTable(1, &error);
 
   LOG_OP(LOG_TEST, PrintlnObject(Evaluate(BoxFixnum(42))));
@@ -669,23 +723,27 @@ void TestEvaluate() {
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
   LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
 
-  ReadObject("+", &error);
+  ReadObject("+:binary", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
   LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
 
-  ReadObject("(+ 720 360)", &error);
+  ReadObject("(+:binary 720 360)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
   LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
 
-  ReadObject("(- (+ 720 360) 14)", &error);
+  ReadObject("(-:binary (+:binary 720 360) 14)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
   LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
 
-  ReadObject("(- \"hello\" 14)", &error);
+  ReadObject("(-:binary \"hello\" 14)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
   LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
 
-  ReadObject("(- 14)", &error);
+  ReadObject("(-:unary 14)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
+  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+
+  ReadObject("(+:binary 14 3e3)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
   LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
 
