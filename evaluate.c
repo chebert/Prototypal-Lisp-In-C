@@ -590,50 +590,46 @@ Object MakeProcedure(enum ErrorCode *error) {
   return procedure;
 }
 
+// Remove one argument from arguments, and assigning it to result.
+// If there are no more arguments in arguments, error is set, and nil is returned.
+#define EXTRACT(arguments, result, error) \
+  do { \
+    if (IsNil(arguments)) { \
+      *error = ERROR_EVALUATE_ARITY_MISMATCH; \
+      return nil; \
+    } \
+    result = First(arguments); \
+    arguments = Rest(arguments); \
+  } while (0)
+
+// Performs the type test. If the type is invalid, the error is set and nil is returned.
+#define CHECK_TYPE(test, error) \
+  do { \
+    if (!test) { \
+      *error = ERROR_EVALUATE_INVALID_ARGUMENT_TYPE; \
+      return nil; \
+    } \
+  } while (0)
+
+// Extracts one argument and checks its type. Sets the error/returns if an error occurs.
+#define EXTRACT_TYPE(arguments, type_predicate, result, error) \
+  do { \
+    EXTRACT(arguments, result, error); \
+    CHECK_TYPE(type_predicate(result), error); \
+  } while (0)
+
 Object PrimitiveAddFixnumFixnum(Object arguments, enum ErrorCode *error) {
-  if (IsNil(arguments)) {
-    *error = ERROR_EVALUATE_ARITY_MISMATCH;
-    return nil;
-  }
-  Object a = First(arguments);
-  if (!IsFixnum(a)) {
-    *error = ERROR_EVALUATE_INVALID_ARGUMENT_TYPE;
-    return nil;
-  }
-  arguments = Rest(arguments);
-  if (IsNil(arguments)) {
-    *error = ERROR_EVALUATE_ARITY_MISMATCH;
-    return nil;
-  }
-  Object b = First(arguments);
-  if (!IsFixnum(b)) {
-    *error = ERROR_EVALUATE_INVALID_ARGUMENT_TYPE;
-    return nil;
-  }
+  Object a, b;
+  EXTRACT_TYPE(arguments, IsFixnum, a, error);
+  EXTRACT_TYPE(arguments, IsFixnum, b, error);
 
   return BoxFixnum(UnboxFixnum(a) + UnboxFixnum(b));
 }
 
 Object PrimitiveSubtractFixnumFixnum(Object arguments, enum ErrorCode *error) {
-  if (IsNil(arguments)) {
-    *error = ERROR_EVALUATE_ARITY_MISMATCH;
-    return nil;
-  }
-  Object a = First(arguments);
-  if (!IsFixnum(a)) {
-    *error = ERROR_EVALUATE_INVALID_ARGUMENT_TYPE;
-    return nil;
-  }
-  arguments = Rest(arguments);
-  if (IsNil(arguments)) {
-    *error = ERROR_EVALUATE_ARITY_MISMATCH;
-    return nil;
-  }
-  Object b = First(arguments);
-  if (!IsFixnum(b)) {
-    *error = ERROR_EVALUATE_INVALID_ARGUMENT_TYPE;
-    return nil;
-  }
+  Object a, b;
+  EXTRACT_TYPE(arguments, IsFixnum, a, error);
+  EXTRACT_TYPE(arguments, IsFixnum, b, error);
   return BoxFixnum(UnboxFixnum(a) - UnboxFixnum(b));
 }
 

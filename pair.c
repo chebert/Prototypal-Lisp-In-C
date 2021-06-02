@@ -75,13 +75,13 @@ Object Rest(Object pair) { return Cdr(pair); }
 void PrintPair(Object pair) {
   u64 reference = UnboxReference(pair);
   printf("(");
-  PrintObject(Car(pair));
+  PrintObject(First(pair));
 
-  Object rest = Cdr(pair);
+  Object rest = Rest(pair);
   if (IsPair(rest)) {
-    for (; IsPair(rest); rest = Cdr(rest)) {
+    for (; IsPair(rest); rest = Rest(rest)) {
       printf(" ");
-      PrintObject(Car(rest));
+      PrintObject(First(rest));
     }
   }
 
