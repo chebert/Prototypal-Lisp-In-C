@@ -16,7 +16,7 @@
 // Pops the top of the Read stack
 Object PopReadStack();
 // Pushes the (read_result . nil) onto the top of the read stack. TODO: can we just push read_result?
-enum ErrorCode PushReadResultOntoStack();
+void PushReadResultOntoStack(enum ErrorCode *error);
 // Reads the next Object from token, and then source.
 const u8 *ReadNextObjectFromToken(const struct Token *token, const u8 *source, enum ErrorCode *error);
 
@@ -49,27 +49,18 @@ Object PopReadStack() {
   return top;
 }
 
-enum ErrorCode PushReadResultOntoStack() {
-  enum ErrorCode error;
-  Object read_stack = AllocatePair(&error);
-  if (error) {
-    LOG_ERROR("Could not allocate pair");
-    return error;
-  }
+void PushReadResultOntoStack(enum ErrorCode *error) {
+  Object read_stack = AllocatePair(error);
+  if (*error) return;
 
   SetCdr(read_stack, GetRegister(REGISTER_READ_STACK));
   SetRegister(REGISTER_READ_STACK, read_stack);
 
-  Object pair = AllocatePair(&error);
-  if (error) {
-    LOG_ERROR("Could not allocate pair");
-    return error;
-  }
+  Object pair = AllocatePair(error);
+  if (*error) return;
 
   SetCar(pair, GetRegister(REGISTER_EXPRESSION));
   SetCar(GetRegister(REGISTER_READ_STACK), pair);
-
-  return error;
 }
 
 b64 IsErrorToken(const struct Token *token) {
@@ -153,21 +144,18 @@ const u8 *ReadNextObjectFromToken(const struct Token *token, const u8 *source, e
     source = BeginReadList(source, error);
   } else if (token->type == TOKEN_SYMBOLIC_QUOTE) {
     source = ReadNextObject(source, error);
-    if (*error)
-      return source;
+    if (*error) return source;
 
     // read-result: object
     Object result = AllocatePair(error);
-    if (*error)
-      return source;
+    if (*error) return source;
     SetCar(result, GetRegister(REGISTER_EXPRESSION));
     SetCdr(result, nil);
     SetRegister(REGISTER_EXPRESSION, result);
     // read-result: (object)
 
     result = AllocatePair(error);
-    if (*error)
-      return source;
+    if (*error) return source;
     Object quote = FindSymbol("quote");
     assert(!IsNil(quote));
     SetCar(result, FindSymbol("quote"));
@@ -199,10 +187,9 @@ const u8 *ReadNextListObject(const struct Token *token, const u8 *source, enum E
   // (a b c d)
   //     ^-here
   // stack: (a)
-  *error = PushReadResultOntoStack();
-  if (*error) {
-    return source;
-  }
+  PushReadResultOntoStack(error);
+  if (*error) return source;
+
   LOG("pushing it onto the read stack: ");
   PrintlnObject(GetRegister(REGISTER_READ_STACK));
   

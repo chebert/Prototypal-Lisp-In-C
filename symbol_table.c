@@ -37,7 +37,7 @@ void InitializeSymbolTable(u64 size) {
 
 // A Symbol table is a Hashed set, represented as a vector of Symbol Lists
 Object MakeSymbolTable(u64 size) {
-  enum ErrorCode error;
+  enum ErrorCode error = NO_ERROR;
   Object table = AllocateVector(size, &error);
   assert(!error);
   return table;
@@ -172,7 +172,7 @@ void TestSymbolTable() {
   Object symbol = FindSymbol(symbol_name);
   assert(symbol == nil);
 
-  enum ErrorCode error;
+  enum ErrorCode error = NO_ERROR;
   symbol = InternSymbol(symbol_name, &error);
   PrintlnObject(symbol);
 

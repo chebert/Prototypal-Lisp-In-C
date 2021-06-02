@@ -99,17 +99,14 @@ Object FirstExpression(Object sequence);
 Object RestExpressions(Object sequence);
 b64 IsLastExpression(Object sequence);
 
-#define SAVE(reg, error) \
-  do { \
-    Save(reg, &error); \
-    if (error) { \
-      next = EvaluateError; \
-      return; \
-    } \
-  } while(0);
+#define CHECK(error) \
+  do { if (error) { next = EvaluateError; return; } } while(0)
 
-static EvaluateFunction next;
-static enum ErrorCode error;
+#define SAVE_AND_CHECK(reg, error) \
+  do { Save(reg, &error); CHECK(error); } while(0)
+
+static EvaluateFunction next = 0;
+static enum ErrorCode error = NO_ERROR;
 
 // Primitives
 Object PrimitiveAddFixnumFixnum(Object arguments) {
@@ -238,9 +235,8 @@ b64 IsLambda(Object expression)      { return IsTaggedList(expression, "fn"); }
 b64 IsApplication(Object expression) { return IsPair(expression); }
 
 void EvaluateSelfEvaluating() {
-  Object expression = GetExpression();
   LOG("Self evaluating");
-  SetValue(expression);
+  SetValue(GetExpression());
   next = GetContinue();
 }
 void EvaluateVariable() {
@@ -251,6 +247,7 @@ void EvaluateVariable() {
   Object value = LookupVariableValue(GetExpression(), GetEnvironment(), &found);
   if (!found) {
     LOG_ERROR("Could not find %s in environment", StringCharacterBuffer(GetExpression()));
+    error = ERROR_EVALUATE_UNBOUND_VARIABLE;
     next = EvaluateError;
   } else {
     SetValue(value);
@@ -259,35 +256,29 @@ void EvaluateVariable() {
 }
 void EvaluateQuoted() {
   LOG("Quoted expression");
-  Object expression = GetExpression();
-  SetValue(Second(expression));
+  SetValue(Second(GetExpression()));
   next = GetContinue();
 }
 void EvaluateLambda() {
   LOG("Lambda expression");
-  Object expression = GetExpression();
-  SetUnevaluated(LambdaParameters(expression));
-  SetExpression(LambdaBody(expression));
+  SetUnevaluated(LambdaParameters(GetExpression()));
+  SetExpression(LambdaBody(GetExpression()));
   LOG("Lambda body: ");
   PrintlnObject(GetExpression());
   SetValue(MakeProcedure(&error));
-  if (error) {
-    next = EvaluateError;
-  } else {
-    next = GetContinue();
-  }
+  CHECK(error);
+  next = GetContinue();
 }
 
 void EvaluateApplication() {
   LOG("Application");
-  Object expression = GetExpression();
-  SAVE(REGISTER_CONTINUE, error);
-  SAVE(REGISTER_ENVIRONMENT, error);
-  SetUnevaluated(Operands(expression));
-  SAVE(REGISTER_UNEVALUATED, error);
+  SAVE_AND_CHECK(REGISTER_CONTINUE, error);
+  SAVE_AND_CHECK(REGISTER_ENVIRONMENT, error);
+  SetUnevaluated(Operands(GetExpression()));
+  SAVE_AND_CHECK(REGISTER_UNEVALUATED, error);
   // Evaluate the operator
   LOG("Evaluating operator");
-  SetExpression(Operator(expression));
+  SetExpression(Operator(GetExpression()));
   SetContinue(EvaluateApplicationOperands);
   next = EvaluateDispatch;
 }
@@ -307,7 +298,7 @@ void EvaluateApplicationOperands() {
     next = EvaluateApplicationDispatch;
   } else {
     // CASE: 1 or more operands
-    SAVE(REGISTER_PROCEDURE, error);
+    SAVE_AND_CHECK(REGISTER_PROCEDURE, error);
     next = EvaluateApplicationOperandLoop;
   }
 }
@@ -337,26 +328,18 @@ void EvaluateApplicationAccumulateArgument() {
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_ARGUMENT_LIST);
   AdjoinArgument(&error);
-  if (error) {
-    LOG_ERROR("Could not adjoin argument");
-    next = EvaluateError;
-  } else {
-    SetUnevaluated(RestOperands(GetUnevaluated()));
-    next = EvaluateApplicationOperandLoop;
-  }
+  CHECK(error);
+  SetUnevaluated(RestOperands(GetUnevaluated()));
+  next = EvaluateApplicationOperandLoop;
 }
 
 void EvaluateApplicationAccumulateLastArgument() {
   LOG("Accumulating last argument");
   Restore(REGISTER_ARGUMENT_LIST);
   AdjoinArgument(&error);
-  if (error) {
-    LOG_ERROR("Could not adjoin argument");
-    next = EvaluateError;
-  } else {
-    Restore(REGISTER_PROCEDURE);
-    next = EvaluateApplicationDispatch;
-  }
+  CHECK(error);
+  Restore(REGISTER_PROCEDURE);
+  next = EvaluateApplicationDispatch;
 }
 
 void EvaluateApplicationLastOperand() {
@@ -368,7 +351,7 @@ void EvaluateApplicationLastOperand() {
 void EvaluateApplicationOperandLoop() {
   LOG("Evaluating next operand");
   // Evaluate operands
-  SAVE(REGISTER_ARGUMENT_LIST, error);
+  SAVE_AND_CHECK(REGISTER_ARGUMENT_LIST, error);
 
   SetExpression(FirstOperand(GetUnevaluated()));
 
@@ -378,8 +361,8 @@ void EvaluateApplicationOperandLoop() {
   } else {
     // CASE: 2+ arguments
     LOG("not the last operand");
-    SAVE(REGISTER_ENVIRONMENT, error);
-    SAVE(REGISTER_UNEVALUATED, error);
+    SAVE_AND_CHECK(REGISTER_ENVIRONMENT, error);
+    SAVE_AND_CHECK(REGISTER_UNEVALUATED, error);
     SetContinue(EvaluateApplicationAccumulateArgument);
     next = EvaluateDispatch;
   }
@@ -404,7 +387,7 @@ void EvaluateApplicationDispatch() {
     SetUnevaluated(ProcedureBody(proc));
     next = EvaluateSequence;
   } else {
-    LOG_ERROR("Unknown procedure type");
+    error = ERROR_EVALUATE_UNKNOWN_PROCEDURE_TYPE;
     next = EvaluateError;
   }
 }
@@ -412,7 +395,7 @@ void EvaluateApplicationDispatch() {
 void EvaluateBegin() {
   LOG("Evaluate begin");
   SetUnevaluated(BeginActions(GetExpression()));
-  SAVE(REGISTER_CONTINUE, error);
+  SAVE_AND_CHECK(REGISTER_CONTINUE, error);
   next = EvaluateSequence;
 }
 
@@ -441,8 +424,8 @@ void EvaluateSequence() {
     next = EvaluateSequenceLastExpression;
   } else {
     // Case: 2+ expressions left to evaluate
-    SAVE(REGISTER_UNEVALUATED, error);
-    SAVE(REGISTER_ENVIRONMENT, error);
+    SAVE_AND_CHECK(REGISTER_UNEVALUATED, error);
+    SAVE_AND_CHECK(REGISTER_ENVIRONMENT, error);
     SetContinue(EvaluateSequenceContinue);
     next = EvaluateDispatch;
   }
@@ -464,9 +447,9 @@ void EvaluateIfDecide() {
 
 void EvaluateIf() {
   LOG("Evaluate if");
-  SAVE(REGISTER_EXPRESSION, error);
-  SAVE(REGISTER_ENVIRONMENT, error);
-  SAVE(REGISTER_CONTINUE, error);
+  SAVE_AND_CHECK(REGISTER_EXPRESSION, error);
+  SAVE_AND_CHECK(REGISTER_ENVIRONMENT, error);
+  SAVE_AND_CHECK(REGISTER_CONTINUE, error);
   SetContinue(EvaluateIfDecide);
   SetExpression(IfPredicate(GetExpression()));
   next = EvaluateDispatch;
@@ -491,11 +474,11 @@ void EvaluateAssignment1() {
 void EvaluateAssignment() {
   LOG("Evaluate assignment");
   SetUnevaluated(AssignmentVariable(GetExpression()));
-  SAVE(REGISTER_UNEVALUATED, error);
+  SAVE_AND_CHECK(REGISTER_UNEVALUATED, error);
 
   SetExpression(AssignmentValue(GetExpression()));
-  SAVE(REGISTER_ENVIRONMENT, error);
-  SAVE(REGISTER_CONTINUE, error);
+  SAVE_AND_CHECK(REGISTER_ENVIRONMENT, error);
+  SAVE_AND_CHECK(REGISTER_CONTINUE, error);
   SetContinue(EvaluateAssignment1);
   next = EvaluateDispatch;
 }
@@ -521,7 +504,7 @@ void EvaluateDefinition1() {
 
 void EvaluateDefinition() {
   SetUnevaluated(DefinitionVariable(GetExpression()));
-  SAVE(REGISTER_UNEVALUATED, error);
+  SAVE_AND_CHECK(REGISTER_UNEVALUATED, error);
 
   LOG("Setting, then saving Unevaluated:");
   PrintlnObject(GetUnevaluated());
@@ -531,8 +514,8 @@ void EvaluateDefinition() {
   LOG("Setting the expression:");
   PrintlnObject(GetExpression());
 
-  SAVE(REGISTER_ENVIRONMENT, error);
-  SAVE(REGISTER_CONTINUE, error);
+  SAVE_AND_CHECK(REGISTER_ENVIRONMENT, error);
+  SAVE_AND_CHECK(REGISTER_CONTINUE, error);
   SetContinue(EvaluateDefinition1);
 
   LOG("Setting continue to %x", EvaluateDefinition1);
@@ -543,6 +526,7 @@ void EvaluateDefinition() {
 void EvaluateUnknown() {
   LOG_ERROR("Unknown Expression");
   PrintlnObject(GetExpression());
+  error = ERROR_EVALUATE_UNKNOWN_EXPRESSION;
   next = EvaluateError;
 }
 

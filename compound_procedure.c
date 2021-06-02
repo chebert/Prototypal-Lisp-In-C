@@ -8,7 +8,7 @@
 #include "tag.h"
 
 Object AllocateCompoundProcedure(enum ErrorCode *error) {
-  *error = EnsureEnoughMemory(3);
+  EnsureEnoughMemory(3, error);
   if (*error) return nil;
 
   // [ ..., free.. ]

@@ -8,7 +8,7 @@
 #include "vector.h"
 
 void InitializeRoot() {
-  enum ErrorCode error;
+  enum ErrorCode error = NO_ERROR;
   memory.root = AllocateVector(NUM_REGISTERS, &error);
   assert(!error);
 }

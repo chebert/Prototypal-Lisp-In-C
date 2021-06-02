@@ -7,8 +7,9 @@
 #include "memory.h"
 #include "root.h"
 
+// TODO: Fixed-size Allocations (Pair, Procedure)
 Object AllocatePair(enum ErrorCode *error) {
-  *error = EnsureEnoughMemory(2);
+  EnsureEnoughMemory(2, error);
   if (*error) {
     LOG_ERROR("Not enough memory to allocate pair");
     return nil;

@@ -129,15 +129,14 @@ b64 HasEnoughMemory(u64 num_objects_required) {
   return memory.free + num_objects_required <= memory.max_objects;
 }
 
-enum ErrorCode EnsureEnoughMemory(u64 num_objects_required) {
+void EnsureEnoughMemory(u64 num_objects_required, enum ErrorCode *error) {
   if (!HasEnoughMemory(num_objects_required)) {
     CollectGarbage();
   }
 
   if (!HasEnoughMemory(num_objects_required)) {
-    return ERROR_OUT_OF_MEMORY;
+    *error = ERROR_OUT_OF_MEMORY;
   }
-  return NO_ERROR;
 }
 
 void PrintObject(Object object) {
@@ -205,7 +204,7 @@ void PrintMemory() {
 
 // Unsafe, only for testing
 static Object MakePair(Object car, Object cdr) {
-  enum ErrorCode error;
+  enum ErrorCode error = NO_ERROR;
   Object pair = AllocatePair(&error);
   assert(!error);
   // REFERENCES INVALIDATED
@@ -217,7 +216,7 @@ static Object MakePair(Object car, Object cdr) {
 void TestMemory() {
   InitializeMemory(32);
   MakePair(BoxFixnum(4), BoxFixnum(2));
-  enum ErrorCode error;
+  enum ErrorCode error = NO_ERROR;
   Object string = AllocateString("Hello", &error);
 
   Object vector = AllocateVector(3, &error);

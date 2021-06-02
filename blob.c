@@ -13,7 +13,7 @@ u64 CeilingU64(u64 numerator, u64 denominator);
 
 u64 AllocateBlob(u64 num_bytes, enum ErrorCode *error) {
   u64 num_objects = NumObjectsPerBlob(num_bytes);
-  *error = EnsureEnoughMemory(num_objects);
+  EnsureEnoughMemory(num_objects, error);
   if (*error) {
     LOG_ERROR("Error allocating blob of size %llu objects: %s",
         num_objects,

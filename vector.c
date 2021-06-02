@@ -8,7 +8,7 @@
 #include "memory.h"
 
 Object AllocateVector(u64 num_objects, enum ErrorCode *error) {
-  *error = EnsureEnoughMemory(num_objects + 1);
+  EnsureEnoughMemory(num_objects + 1, error);
   if (*error) {
     LOG_ERROR("Not enough memory to allocate vector of size %llu. %s", num_objects);
     return nil;

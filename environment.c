@@ -42,7 +42,7 @@ void SetVariableValue(Object variable, Object value, Object environment) {
 }
 
 void DefineVariable() {
-  enum ErrorCode error;
+  enum ErrorCode error = NO_ERROR;
   // Environment := (scope . more-scopes)
   // Scope       := (variables . values)
   {
@@ -70,7 +70,7 @@ void DefineVariable() {
 }
 
 void ExtendEnvironment() {
-  enum ErrorCode error;
+  enum ErrorCode error = NO_ERROR;
   {
     Object new_environment = AllocatePair(&error);
     if (error) {
@@ -93,7 +93,7 @@ void ExtendEnvironment() {
 }
 
 void MakeInitialEnvironment() {
-  enum ErrorCode error;
+  enum ErrorCode error = NO_ERROR;
   SetEnvironment(AllocatePair(&error));
   if (error) {
     assert(!"Could not allocate initial environment");
