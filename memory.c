@@ -82,7 +82,6 @@ Object MoveObject(Object object) {
     case TAG_TRUE:
     case TAG_FALSE:
     case TAG_FIXNUM:
-    case TAG_REAL32:
     case TAG_PRIMITIVE_PROCEDURE:
       return MovePrimitive(object);
 
@@ -158,7 +157,6 @@ void PrintObject(Object object) {
     case TAG_TRUE:   printf("#t");  break;
     case TAG_FALSE:  printf("#f");  break;
     case TAG_FIXNUM: printf("%lld", UnboxFixnum(object)); break;
-    case TAG_REAL32: printf("%ff",  UnboxReal32(object)); break;
     case TAG_PRIMITIVE_PROCEDURE: printf("<procedure %x>", UnboxPrimitiveProcedure(object)); break;
 
     // Reference Objects
@@ -190,7 +188,6 @@ void PrintReference(Object object) {
       case TAG_TRUE:   printf("true");  break;
       case TAG_FALSE:  printf("false"); break;
       case TAG_FIXNUM: printf("%lld", UnboxFixnum(object)); break;
-      case TAG_REAL32: printf( "%ff", UnboxReal32(object)); break;
       // Reference Objects
       case TAG_PAIR:               printf("<Pair %llu>",              UnboxReference(object)); break;
       case TAG_STRING:             printf("<String %llu>",            UnboxReference(object)); break;

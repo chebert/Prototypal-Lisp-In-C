@@ -86,7 +86,6 @@ void HandleErrorToken(const struct Token *token, enum ErrorCode *error) {
 b64 IsSingleToken(const struct Token *token) {
   switch (token->type) {
     case TOKEN_INTEGER:
-    case TOKEN_REAL32:
     case TOKEN_REAL64:
     case TOKEN_STRING:
     case TOKEN_SYMBOL:
@@ -106,14 +105,6 @@ Object ProcessSingleToken(const struct Token *token, enum ErrorCode *error) {
       object = nil;
     } else {
       object = BoxFixnum(value);
-    }
-  } else if (token->type == TOKEN_REAL32) {
-    real32 value;
-    if (!sscanf(data, "%f", &value)) {
-      *error = ERROR_READ_INVALID_REAL32;
-      object = nil;
-    } else  {
-      object = BoxReal32(value);
     }
   } else if (token->type == TOKEN_REAL64) {
     real64 value;

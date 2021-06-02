@@ -207,7 +207,6 @@ b64 IsSelfEvaluating(Object expression) {
     || IsTrue(expression)
     || IsFalse(expression)
     || IsFixnum(expression)
-    || IsReal32(expression)
     || IsReal64(expression)
     || IsVector(expression)
     || IsByteVector(expression)
@@ -622,7 +621,6 @@ Object PrimitiveAddFixnumFixnum(Object arguments, enum ErrorCode *error) {
   Object a, b;
   EXTRACT_TYPE(arguments, IsFixnum, a, error);
   EXTRACT_TYPE(arguments, IsFixnum, b, error);
-
   return BoxFixnum(UnboxFixnum(a) + UnboxFixnum(b));
 }
 

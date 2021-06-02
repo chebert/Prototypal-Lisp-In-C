@@ -58,11 +58,6 @@ b64 IsReal64(Object obj) { return !IsTagged(obj); }
 enum Tag GetTag(Object object) { return SHIFT_RIGHT(TAG_MASK & object, TAG_SHIFT); }
 
 // Functions to convert reals to bytes without casting.
-real32 U32ToReal32(u32 value) {
-  union { real32 real32; u32 u32; } u;
-  u.u32 = value; 
-  return u.real32;
-}
 u32 Real32ToU32(real32 value) {
   union { real32 real32; u32 u32; } u;
   u.real32 = value; 
@@ -89,7 +84,6 @@ b64 IsBlobHeader(Object object)  { return HasTag(object, TAG_BLOB_HEADER); }
 b64 IsFixnum(Object object)      { return HasTag(object, TAG_FIXNUM); }
 b64 IsTrue(Object object)        { return HasTag(object, TAG_TRUE); }
 b64 IsFalse(Object object)       { return HasTag(object, TAG_FALSE); }
-b64 IsReal32(Object object)      { return HasTag(object, TAG_REAL32); }
 b64 IsNil(Object object)         { return HasTag(object, TAG_NIL); }
 b64 IsBoolean(Object object) {
   if (IsTagged(object)) {
@@ -119,7 +113,6 @@ Object false = TAGGED_OBJECT_MASK | SHIFT_LEFT(TAG_FALSE, TAG_SHIFT);
 // TODO: Maintain sign when truncating?
 Object BoxFixnum(s64 fixnum)               { return TagPayload(PAYLOAD_MASK & fixnum, TAG_FIXNUM); }
 Object BoxBoolean(b64 boolean)             { return TagPayload(0, boolean ? TAG_TRUE : TAG_FALSE); }
-Object BoxReal32(real32 value)             { return TagPayload(Real32ToU32(value), TAG_REAL32); }
 Object BoxPair(u64 reference)              { return TagPayload(PAYLOAD_MASK & reference, TAG_PAIR); }
 Object BoxVector(u64 reference)            { return TagPayload(PAYLOAD_MASK & reference, TAG_VECTOR); }
 Object BoxByteVector(u64 reference)        { return TagPayload(PAYLOAD_MASK & reference, TAG_BYTE_VECTOR); }
@@ -151,7 +144,6 @@ s64 UnboxFixnum(Object object) {
 }
 
 b64    UnboxBoolean(Object object)    { return IsFalse(object) ? 0 : 1; }
-real32 UnboxReal32(Object object)     { return U32ToReal32((u32)(0xffffffff & object)); }
 real64 UnboxReal64(Object object)     { return U64ToReal64(object); }
 u64    UnboxReference(Object object)  { return (PAYLOAD_MASK & object); }
 u64    UnboxBlobHeader(Object object) { return (PAYLOAD_MASK & object); }
@@ -178,10 +170,7 @@ void TestTag() {
   assert(IsPair(BoxPair(42)));
   assert(IsBoolean(BoxBoolean(1)));
 
-  assert(!IsBoolean(BoxReal32(3.14159f)));
-
-  assert(UnboxReal32(BoxReal32(3.14159f)) == 3.14159f);
-  assert(IsReal32(BoxReal32(3.14159f)));
+  assert(!IsBoolean(BoxReal64(3.14159)));
 
   assert(UnboxReal64(BoxReal64(3.14159)) == 3.14159);
   assert(IsReal64(BoxReal64(3.14159)));

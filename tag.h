@@ -30,7 +30,6 @@ enum Tag {
 
   // Primitive Types
   TAG_FIXNUM, // Fixnum is a 47-bit signed integer
-  TAG_REAL32, // 32-bit float
   TAG_PRIMITIVE_PROCEDURE, // An object holding a PrimitiveFunction
   TAG_EVALUATE_FUNCTION = TAG_PRIMITIVE_PROCEDURE, // An object holding an EvaluateFunction
 
@@ -63,7 +62,6 @@ b64 IsBlobHeader(Object object);
 b64 IsFixnum(Object object);
 b64 IsTrue(Object object);
 b64 IsFalse(Object object);
-b64 IsReal32(Object object);
 b64 IsNil(Object object);
 b64 IsBoolean(Object object); 
 b64 IsPair(Object object);
@@ -78,7 +76,6 @@ b64 IsCompoundProcedure(Object object);
 // Construct boxed values given native C types
 Object BoxFixnum(s64 fixnum); // Truncates to 47 bits
 Object BoxBoolean(b64 boolean);
-Object BoxReal32(real32 value);
 Object BoxReal64(real64 value);
 Object BoxPrimitiveProcedure(PrimitiveFunction proc);
 Object BoxEvaluateFunction(EvaluateFunction func);
@@ -100,7 +97,6 @@ extern Object false;
 // Unbox from Object to native C types
 s64    UnboxFixnum(Object object); 
 b64    UnboxBoolean(Object object);
-real32 UnboxReal32(Object object);
 real64 UnboxReal64(Object object);
 PrimitiveFunction UnboxPrimitiveProcedure(Object object);
 EvaluateFunction UnboxEvaluateFunction(Object object);
