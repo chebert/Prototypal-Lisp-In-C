@@ -59,10 +59,6 @@ void EvaluateError();
 b64 IsList(Object list);
 Object MakeProcedure(enum ErrorCode *error);
 
-Object Second(Object list);
-Object Third(Object list);
-Object Fourth(Object list);
-
 // Procedures
 Object ApplyPrimitiveProcedure(Object procedure, Object arguments, enum ErrorCode *error);
 
@@ -375,7 +371,7 @@ void EvaluateApplicationOperandLoop() {
     next = EvaluateDispatch;
   } else {
     // CASE: arguments are not a list
-    // TODO:
+    error = ERROR_EVALUATE_APPLICATION_DOTTED_LIST;
     next = EvaluateError;
   }
 }
@@ -410,11 +406,17 @@ void EvaluateBegin() {
   LOG(LOG_EVALUATE, "Evaluate begin");
   Object expression = Rest(GetExpression());
   if (IsPair(expression)) {
+    // (begin expressions...)
     SetUnevaluated(expression);
     SAVE_AND_CHECK(REGISTER_CONTINUE, error);
     next = EvaluateSequence;
+  } else if (IsNil(expression)) {
+    // (begin)
+    error = ERROR_EVALUATE_BEGIN_EMPTY;
+    next = EvaluateError;
   } else {
     // (begin . junk)
+    error = ERROR_EVALUATE_BEGIN_MALFORMED;
     next = EvaluateError;
   }
 }
@@ -453,6 +455,7 @@ void EvaluateSequence() {
     }
   } else {
     // Case: 0 expressions in sequence
+    error = ERROR_EVALUATE_SEQUENCE_EMPTY;
     next = EvaluateError;
   }
 }
@@ -638,6 +641,7 @@ void EvaluateDefinition() {
 void EvaluateUnknown() {
   LOG_ERROR("Unknown Expression");
   LOG_OP(LOG_EVALUATE, PrintlnObject(GetExpression()));
+
   error = ERROR_EVALUATE_UNKNOWN_EXPRESSION;
   next = EvaluateError;
 }
@@ -646,10 +650,6 @@ void EvaluateError() {
   LOG_ERROR("%s", ErrorCodeString(error));
   next = 0;
 }
-
-Object Second(Object list) { return Car(Cdr(list)); }
-Object Third(Object list) { return Car(Cdr(Cdr(list))); }
-Object Fourth(Object list) { return Car(Cdr(Cdr(Cdr(list)))); }
 
 Object ApplyPrimitiveProcedure(Object procedure, Object arguments, enum ErrorCode *error) { 
   LOG(LOG_EVALUATE, "applying primitive function");
