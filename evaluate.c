@@ -676,7 +676,7 @@ b64    IsLastOperand(Object operands) { return HasNoOperands(RestOperands(operan
 // Sequence: (expressions...)
 Object FirstExpression(Object sequence)  { return First(sequence); }
 Object RestExpressions(Object sequence)  { return Rest(sequence); }
-b64    IsLastExpression(Object sequence) { return Rest(sequence) == nil; }
+b64    IsLastExpression(Object sequence) { return IsNil(RestExpressions(sequence)); }
 
 b64 IsList(Object list) { return IsNil(list) || IsPair(list); }
 

@@ -4,15 +4,15 @@
 #include "error.h"
 #include "tag.h"
 
-Object PrimitiveUnaryAdd(Object arguments, enum ErrorCode *error);
-Object PrimitiveBinaryAdd(Object arguments, enum ErrorCode *error);
-Object PrimitiveUnarySubtract(Object arguments, enum ErrorCode *error);
-Object PrimitiveBinarySubtract(Object arguments, enum ErrorCode *error);
-
 #define PRIMITIVES \
-  X("+:unary", PrimitiveUnaryAdd) \
   X("+:binary", PrimitiveBinaryAdd) \
   X("-:unary", PrimitiveUnarySubtract) \
-  X("-:binary", PrimitiveBinarySubtract)
+  X("-:binary", PrimitiveBinarySubtract) \
+  X("*:binary", PrimitiveUnaryMultiply) \
+  X("/:binary", PrimitiveUnaryDivide)
+
+#define X(str, primitive_name) Object primitive_name(Object arguments, enum ErrorCode *error)
+  PRIMITIVES
+#undef X
 
 #endif
