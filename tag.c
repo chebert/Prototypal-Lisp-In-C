@@ -47,6 +47,9 @@
 #define TAG_SHIFT 47
 #define TAG_MASK  SHIFT_LEFT(0b1111, TAG_SHIFT)
 
+s64 most_positive_fixnum = SHIFT_LEFT(1, TAG_SHIFT-1) - 1;
+s64 most_negative_fixnum = -SHIFT_LEFT(1, TAG_SHIFT-1);
+
 b64 IsTagged(Object obj) { return (obj & TAGGED_OBJECT_MASK) == TAGGED_OBJECT_MASK; }
 b64 IsReal64(Object obj) { return !IsTagged(obj); }
 

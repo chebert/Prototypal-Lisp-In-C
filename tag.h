@@ -94,6 +94,9 @@ extern Object nil;
 extern Object true;
 extern Object false;
 
+extern s64 most_positive_fixnum;
+extern s64 most_negative_fixnum;
+
 // Unbox from Object to native C types
 s64    UnboxFixnum(Object object); 
 b64    UnboxBoolean(Object object);

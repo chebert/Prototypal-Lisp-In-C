@@ -752,5 +752,17 @@ void TestEvaluate() {
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
   LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
 
+  ReadObject("(/:binary 14 0)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
+  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+
+  ReadObject("(/:binary 14 7)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
+  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+
+  ReadObject("(remainder 3 4)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
+  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+
   DestroyMemory();
 }

@@ -8,10 +8,11 @@
   X("+:binary", PrimitiveBinaryAdd) \
   X("-:unary", PrimitiveUnarySubtract) \
   X("-:binary", PrimitiveBinarySubtract) \
-  X("*:binary", PrimitiveUnaryMultiply) \
-  X("/:binary", PrimitiveUnaryDivide)
+  X("*:binary", PrimitiveBinaryMultiply) \
+  X("/:binary", PrimitiveBinaryDivide) \
+  X("remainder", PrimitiveRemainder)
 
-#define X(str, primitive_name) Object primitive_name(Object arguments, enum ErrorCode *error)
+#define X(str, primitive_name) Object primitive_name(Object arguments, enum ErrorCode *error);
   PRIMITIVES
 #undef X
 
