@@ -87,6 +87,7 @@ b64 IsLastExpression(Object sequence);
 #define SAVE_AND_CHECK(reg, error) \
   do { Save(reg, &error); CHECK(error); } while(0)
 
+// TODO: Pass next, &error thhrough evaluate functions
 static EvaluateFunction next = 0;
 static enum ErrorCode error = NO_ERROR;
 

@@ -3,6 +3,14 @@
 #include "log.h"
 #include "pair.h"
 
+// Sets the error code and returns nil.
+Object InvalidArgumentError(enum ErrorCode *error);
+// Sets the error code and returns nil.
+Object DivideByZeroError(enum ErrorCode *error);
+// Checks for underflow or overflow and returns the boxed fixnum.
+// If an error occurs, returns nil and sets the error code.
+Object FixnumArithmeticResult(s64 result, enum ErrorCode *error);
+
 // Remove one argument from arguments, and assigning it to result.
 // If there are no more arguments in arguments, error is set, and nil is returned.
 #define EXTRACT_ARGUMENT(arguments, result, error) \
@@ -15,6 +23,7 @@
     arguments = Rest(arguments); \
   } while (0)
 
+// Assert that arguments is nil, otherwise set error and return nil.
 #define CHECK_NO_MORE_ARGUMENTS(arguments, error) \
   do { \
     if (!IsNil(arguments)) { \
@@ -57,25 +66,41 @@ Object DivideByZeroError(enum ErrorCode *error) {
 }
 
 Object FixnumArithmeticResult(s64 result, enum ErrorCode *error) {
-  LOG_ERROR("%lld, %lld", most_negative_fixnum, most_positive_fixnum);
   if (result < most_negative_fixnum) {
     *error = ERROR_EVALUATE_ARITHMETIC_UNDERFLOW;
     return nil;
-  }
-  if (result > most_positive_fixnum) {
+  } else if (result > most_positive_fixnum) {
     *error = ERROR_EVALUATE_ARITHMETIC_OVERFLOW;
     return nil;
+  } else {
+    return BoxFixnum(result);
   }
-  return BoxFixnum(result);
 }
 
-#define EXTRACT_2_ARGUMENTS(a, b, arguments, error) \
-  do { \
-    EXTRACT_ARGUMENT(arguments, a, error); \
-    EXTRACT_ARGUMENT(arguments, b, error); \
-    CHECK_NO_MORE_ARGUMENTS(arguments, error); \
-  } while (0)
+void ExtractArgument(Object *arguments, Object *result, enum ErrorCode *error) {
+  if (IsNil(*arguments)) {
+    *error = ERROR_EVALUATE_ARITY_MISMATCH;
+  } else {
+    *result = First(*arguments);
+    *arguments = Rest(*arguments);
+  }
+}
 
+void CheckEmptyArguments(Object *arguments, enum ErrorCode *error) {
+  if (!IsNil(*arguments)) {
+    *error = ERROR_EVALUATE_ARITY_MISMATCH;
+  }
+}
+
+void Extract2Arguments(Object *arguments, Object *a, Object *b, enum ErrorCode *error) {
+  ExtractArgument(arguments, a, error);
+  if (*error) return;
+  ExtractArgument(arguments, b, error);
+  if (*error) return;
+  CheckEmptyArguments(arguments, error);
+}
+
+// Return the result of (Fixnum `operator` Real64Object)
 #define PERFORM_BINARY_ARITHMETIC_FIXNUM_REAL(fixnum_value, b, operator, error) \
   do { \
     if (IsReal64(b)) return BoxReal64(fixnum_value operator UnboxReal64(b)); \
@@ -111,25 +136,30 @@ Object FixnumArithmeticResult(s64 result, enum ErrorCode *error) {
 
 Object PrimitiveBinaryAdd(Object arguments, enum ErrorCode *error) {
   Object a, b;
-  EXTRACT_2_ARGUMENTS(a, b, arguments, error);
+  Extract2Arguments(&arguments, &a, &b, error);
+  if (*error) return nil;
   PERFORM_BINARY_ARITHMETIC(a, b, +, error);
 }
 
 Object PrimitiveBinarySubtract(Object arguments, enum ErrorCode *error) {
   Object a, b;
-  EXTRACT_2_ARGUMENTS(a, b, arguments, error);
+  Extract2Arguments(&arguments, &a, &b, error);
+  if (*error) return nil;
   PERFORM_BINARY_ARITHMETIC(a, b, -, error);
 }
 
 Object PrimitiveBinaryMultiply(Object arguments, enum ErrorCode *error) {
   Object a, b;
-  EXTRACT_2_ARGUMENTS(a, b, arguments, error);
+  Extract2Arguments(&arguments, &a, &b, error);
+  if (*error) return nil;
   PERFORM_BINARY_ARITHMETIC(a, b, *, error);
 }
 
 Object PrimitiveBinaryDivide(Object arguments, enum ErrorCode *error) {
   Object a, b;
-  EXTRACT_2_ARGUMENTS(a, b, arguments, error);
+  Extract2Arguments(&arguments, &a, &b, error);
+  if (*error) return nil;
+
   if (IsFixnum(a)) {
     s64 aval = UnboxFixnum(a);
     if (IsFixnum(b)) {
@@ -137,9 +167,9 @@ Object PrimitiveBinaryDivide(Object arguments, enum ErrorCode *error) {
       if (bval == 0)
         return DivideByZeroError(error);
       return BoxFixnum(aval / bval);
-    } 
-
-    PERFORM_BINARY_ARITHMETIC_FIXNUM_REAL(aval, b, /, error);
+    } else {
+      PERFORM_BINARY_ARITHMETIC_FIXNUM_REAL(aval, b, /, error);
+    }
   } 
   if (IsReal64(a))
     PERFORM_BINARY_ARITHMETIC_REAL64(a, b, /, error);
@@ -148,7 +178,9 @@ Object PrimitiveBinaryDivide(Object arguments, enum ErrorCode *error) {
 
 Object PrimitiveRemainder(Object arguments, enum ErrorCode *error) {
   Object a, b;
-  EXTRACT_2_ARGUMENTS(a, b, arguments, error);
+  Extract2Arguments(&arguments, &a, &b, error);
+  if (*error) return nil;
+
   if (IsFixnum(a) && IsFixnum(b))
     return BoxFixnum(UnboxFixnum(a) % UnboxFixnum(b));
   return InvalidArgumentError(error);
