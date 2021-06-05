@@ -276,7 +276,8 @@ DECLARE_PRIMITIVE(PrimitiveOpenBinaryFileForReading, arguments, error) {
   if (!IsString(string)) return InvalidArgumentError(error);
   FILE *file = fopen(StringCharacterBuffer(string), "rb");
   if (!file) {
-    // TODO
+    *error = ERROR_COULD_NOT_OPEN_BINARY_FILE_FOR_READING;
+    // TODO: read errno?
     return nil;
   }
   return BoxFilePointer(file);
@@ -290,12 +291,12 @@ DECLARE_PRIMITIVE(PrimitiveFileLength, arguments, error) {
 
   FILE *f = UnboxFilePointer(file);
   if (fseek(f, 0, SEEK_END)) {
-    // TODO
+    *error = ERROR_COULD_NOT_SEEK_TO_END_OF_FILE;
     return nil;
   }
   s64 length = ftell(f);
   if (length < 0) {
-    // TODO
+    *error = ERROR_COULD_NOT_TELL_FILE_POSITION;
     return nil;
   }
   return BoxFixnum(length);
@@ -310,15 +311,14 @@ DECLARE_PRIMITIVE(PrimitiveCopyFileContents, arguments, error) {
 
   FILE *f = UnboxFilePointer(file);
   if (fseek(f, 0, SEEK_SET)) {
-    // TODO
+    *error = ERROR_COULD_NOT_SEEK_TO_START_OF_FILE;
     return nil;
   }
   s64 length = UnsafeByteVectorLength(byte_vector) - 1;
   // TODO: ByteVectorBuffer
   s64 num_bytes_read = fread(StringCharacterBuffer(byte_vector), 1, length, f);
-  if (length = num_bytes_read) {
-    // TODO
-    return nil;
+  if (ferror(f)) {
+    *error = ERROR_READING_FILE;
   }
   // Null-terminate
   UnsafeByteVectorSet(byte_vector, length, 0);
@@ -334,7 +334,7 @@ DECLARE_PRIMITIVE(PrimitiveCloseFile, arguments, error) {
 
   FILE *f = UnboxFilePointer(file);
   if (fclose(f)) {
-    // TODO
+    *error = ERROR_COULD_NOT_CLOSE_FILE;
     return nil;
   }
   return FindSymbol("ok");
