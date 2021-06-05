@@ -121,9 +121,6 @@ const u8 *TokenTypeString(enum TokenType type) {
   }
 }
 
-
-
-
 enum TokenType NumberOrSymbolTokenType(const u8 *source, u64 length) {
   u8 exponent_marker;
   if (IsInteger(source, length)) {

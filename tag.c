@@ -104,6 +104,7 @@ b64 IsSymbol(Object object)             { return HasTag(object, TAG_SYMBOL); }
 b64 IsCompoundProcedure(Object object)  { return HasTag(object, TAG_COMPOUND_PROCEDURE); }
 b64 IsPrimitiveProcedure(Object object) { return HasTag(object, TAG_PRIMITIVE_PROCEDURE); }
 b64 IsEvaluateFunction(Object object)   { return HasTag(object, TAG_EVALUATE_FUNCTION); }
+b64 IsFilePointer(Object object)        { return HasTag(object, TAG_FILE_POINTER); }
 
 Object TagPayload(u64 payload, enum Tag tag) {
   return TAGGED_OBJECT_MASK | SHIFT_LEFT(tag, TAG_SHIFT) | payload;
@@ -113,7 +114,6 @@ Object nil   = TAGGED_OBJECT_MASK | SHIFT_LEFT(TAG_NIL,   TAG_SHIFT);
 Object true  = TAGGED_OBJECT_MASK | SHIFT_LEFT(TAG_TRUE,  TAG_SHIFT);
 Object false = TAGGED_OBJECT_MASK | SHIFT_LEFT(TAG_FALSE, TAG_SHIFT);
 
-// TODO: Maintain sign when truncating?
 Object BoxFixnum(s64 fixnum)               { return TagPayload(PAYLOAD_MASK & fixnum, TAG_FIXNUM); }
 Object BoxBoolean(b64 boolean)             { return TagPayload(0, boolean ? TAG_TRUE : TAG_FALSE); }
 Object BoxPair(u64 reference)              { return TagPayload(PAYLOAD_MASK & reference, TAG_PAIR); }
@@ -135,6 +135,9 @@ Object BoxPrimitiveProcedure(PrimitiveFunction function) {
 Object BoxEvaluateFunction(EvaluateFunction function) {
   return BoxPrimitiveProcedure((PrimitiveFunction)function);
 }
+Object BoxFilePointer(FILE *file) {
+  return BoxPrimitiveProcedure((PrimitiveFunction)file);
+}
 
 s64 UnboxFixnum(Object object) {
   u64 sign_bit_mask = SHIFT_LEFT(1, TAG_SHIFT-1); 
@@ -155,6 +158,9 @@ PrimitiveFunction UnboxPrimitiveProcedure(Object object) {
 }
 EvaluateFunction UnboxEvaluateFunction(Object object) {
   return (EvaluateFunction)(PAYLOAD_MASK & object);
+}
+FILE *UnboxFilePointer(Object object) {
+  return (FILE *)(PAYLOAD_MASK & object);
 }
 
 // Just for testing.

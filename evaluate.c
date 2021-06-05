@@ -24,7 +24,7 @@ b64 IsLambda(Object expression);
 b64 IsSequence(Object expression);
 b64 IsApplication(Object expression);
 
-Object Evaluate(Object expression);
+Object EvaluateInAFreshEnvironment(Object expression);
 
 // EvaluateFunctions
 void EvaluateDispatch();
@@ -81,13 +81,18 @@ Object FirstExpression(Object sequence);
 Object RestExpressions(Object sequence);
 b64 IsLastExpression(Object sequence);
 
+void ExtractAssignmentArguments(Object expression, Object *variable, Object *value, enum ErrorCode *error);
+void ExtractLambdaArguments(Object expression, Object *parameters, Object *body, enum ErrorCode *error);
+void ExtractDefinitionArguments(Object expression, Object *variable, Object *value, enum ErrorCode *error);
+void ExtractIfPredicate(Object expression, Object *predicate, enum ErrorCode *error);
+void ExtractIfAlternatives(Object expression, Object *consequent, Object *alternative, enum ErrorCode *error);
+
 #define CHECK(error) \
   do { if (error) { next = EvaluateError; return; } } while(0)
 
 #define SAVE_AND_CHECK(reg, error) \
   do { Save(reg, &error); CHECK(error); } while(0)
 
-// TODO: Pass next, &error thhrough evaluate functions
 static EvaluateFunction next = 0;
 static enum ErrorCode error = NO_ERROR;
 
@@ -101,6 +106,22 @@ void DefinePrimitive(const u8 *name, PrimitiveFunction function) {
 }
 
 Object Evaluate(Object expression) {
+  SetExpression(expression);
+  // Set continue to quit when evaluation finishes.
+  SetContinue(0);
+
+  // Start the evaluation by evaluating the provided expression.
+  next = EvaluateDispatch;
+
+  // Run the evaluation loop until quit.
+  while (next)
+    next();
+
+  // Return the evaluated expression.
+  return GetValue();
+}
+
+Object EvaluateInAFreshEnvironment(Object expression) {
   // Set the expression to be evaluated.
   SetExpression(expression);
 
@@ -125,18 +146,7 @@ Object Evaluate(Object expression) {
   PRIMITIVES
 #undef X
 
-  // Set continue to quit when evaluation finishes.
-  SetContinue(0);
-
-  // Start the evaluation by evaluating the provided expression.
-  next = EvaluateDispatch;
-
-  // Run the evaluation loop until quit.
-  while (next)
-    next();
-
-  // Return the evaluated expression.
-  return GetValue();
+  return Evaluate(GetExpression());
 }
 
 void EvaluateDispatch() {
@@ -232,45 +242,53 @@ void EvaluateQuoted() {
     next = EvaluateError;
   }
 }
-void EvaluateLambda() {
-  LOG(LOG_EVALUATE, "Lambda expression");
-  Object expression = Rest(GetExpression());
+
+void ExtractLambdaArguments(Object expression, Object *parameters, Object *body, enum ErrorCode *error) {
+  expression = Rest(expression);
   // (lambda ...)
 
-  if (IsPair(expression)) {
-    // (lambda parameters ...)
-    Object parameters = First(expression);
-    if (IsList(parameters)) {
-      // (lambda parameters body)
-      Object body = Rest(expression);
-      if (IsPair(body)) {
-        SetUnevaluated(parameters);
-        SetExpression(body);
-        LOG(LOG_EVALUATE, "Lambda body: ");
-        LOG_OP(LOG_EVALUATE, PrintlnObject(body));
-        SetValue(MakeProcedure(&error));
-        CHECK(error);
-        next = GetContinue();
-      } else if (IsNil(body)) {
-        // (lambda parameters)
-        error = ERROR_EVALUATE_LAMBDA_BODY_SHOULD_BE_NON_EMPTY;
-        next = EvaluateError;
-      } else {
-        // (lambda parameters . non-pair)
-        Object body = Rest(expression);
-        error = ERROR_EVALUATE_LAMBDA_BODY_MALFORMED;
-        next = EvaluateError;
-      }
-    } else {
-      // (lambda non-list)
-      error = ERROR_EVALUATE_LAMBDA_PARAMETERS_SHOULD_BE_LIST;
-      next = EvaluateError;
-    }
-  } else {
+  if (!IsPair(expression)) {
     // (lambda . parameters)
-    error = ERROR_EVALUATE_LAMBDA_MALFORMED;
-    next = EvaluateError;
+    *error = ERROR_EVALUATE_LAMBDA_MALFORMED;
+    return;
   }
+
+  // (lambda parameters ...)
+  *parameters = First(expression);
+  if (!IsList(*parameters)) {
+    // (lambda non-list)
+    *error = ERROR_EVALUATE_LAMBDA_PARAMETERS_SHOULD_BE_LIST;
+    return;
+  }
+
+  // (lambda parameters body)
+  *body = Rest(expression);
+  if (IsNil(*body)) {
+    // (lambda parameters)
+    *error = ERROR_EVALUATE_LAMBDA_BODY_SHOULD_BE_NON_EMPTY;
+    return;
+  }
+
+  if (!IsPair(*body)) {
+    // (lambda parameters . non-pair)
+    *error = ERROR_EVALUATE_LAMBDA_BODY_MALFORMED;
+    return;
+  }
+}
+
+void EvaluateLambda() {
+  LOG(LOG_EVALUATE, "Lambda expression");
+  Object parameters, body;
+  ExtractLambdaArguments(GetExpression(), &parameters, &body, &error);
+  CHECK(error);
+
+  SetUnevaluated(parameters);
+  SetExpression(body);
+  LOG(LOG_EVALUATE, "Lambda body: ");
+  LOG_OP(LOG_EVALUATE, PrintlnObject(body));
+  SetValue(MakeProcedure(&error));
+  CHECK(error);
+  next = GetContinue();
 }
 
 void EvaluateApplication() {
@@ -461,45 +479,56 @@ void EvaluateSequence() {
   }
 }
 
+void ExtractIfPredicate(Object expression, Object *predicate, enum ErrorCode *error) {
+  expression = Rest(expression);
+  if (!IsPair(expression)) {
+    *error = ERROR_EVALUATE_IF_MALFORMED;
+    return;
+  }
+
+  *predicate = First(expression);
+}
+
+void ExtractIfAlternatives(Object expression, Object *consequent, Object *alternative, enum ErrorCode *error) {
+  expression = Rest(Rest(expression));
+  if (!IsPair(expression)) {
+    // (if predicate . expression)
+    *error = ERROR_EVALUATE_IF_MALFORMED;
+    return;
+  }
+
+  // (if predicate consequent ...)
+  *consequent = First(expression);
+  expression = Rest(expression);
+  if (!IsPair(expression)) {
+    // (if predicate expression . alternative)
+    *error = ERROR_EVALUATE_IF_MALFORMED;
+    return;
+  }
+
+  // (if predicate consequent alternative ...)
+  *alternative = First(expression);
+  if (!IsNil(Rest(expression))) {
+    // (if predicate consequent alternative junk ...)
+    *error = ERROR_EVALUATE_IF_TOO_MANY_ARGUMENTS;
+    return;
+  }
+}
+
 void EvaluateIfDecide() {
   LOG(LOG_EVALUATE, "Evaluate if, condition already evaluated");
   Restore(REGISTER_CONTINUE);
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_EXPRESSION);
 
-  // IfExpression := (if predicate consequent alternative)
-  Object expression = Rest(Rest(GetExpression()));
-  if (IsPair(expression)) {
-    // (if predicate consequent ...)
-    Object consequent = First(expression);
-    expression = Rest(expression);
-    if (IsPair(expression)) {
-      // (if predicate consequent alternative ...)
-      Object alternative = First(expression);
-      if (IsNil(Rest(expression))) {
-        // (if predicate consequent alternative)
-        // expression := (alternative)
-        if (IsTruthy(GetValue())) {
-          SetExpression(consequent);
-        } else {
-          SetExpression(alternative);
-        }
-        next = EvaluateDispatch;
-      } else {
-        // (if predicate consequent alternative junk ...)
-        error = ERROR_EVALUATE_IF_TOO_MANY_ARGUMENTS;
-        next = EvaluateError;
-      }
-    } else {
-      // (if predicate expression . alternative)
-      error = ERROR_EVALUATE_IF_MALFORMED;
-      next = EvaluateError;
-    }
-  } else {
-    // (if predicate . expression)
-    error = ERROR_EVALUATE_IF_MALFORMED;
-    next = EvaluateError;
-  }
+  Object consequent, alternative;
+  ExtractIfAlternatives(GetExpression(), &consequent, &alternative, &error);
+  CHECK(error);
+
+  // (if predicate consequent alternative)
+  // expression := (alternative)
+  SetExpression(IsTruthy(GetValue()) ? consequent : alternative);
+  next = EvaluateDispatch;
 }
 
 void EvaluateIf() {
@@ -509,15 +538,12 @@ void EvaluateIf() {
   SAVE_AND_CHECK(REGISTER_CONTINUE, error);
   SetContinue(EvaluateIfDecide);
 
-  Object expression = Rest(GetExpression());
-  if (IsPair(expression)) {
-    // (if predicate ...)
-    SetExpression(First(expression));
-    next = EvaluateDispatch;
-  } else {
-    error = ERROR_EVALUATE_IF_MALFORMED;
-    next = EvaluateError;
-  }
+  Object predicate;
+  ExtractIfPredicate(GetExpression(), &predicate, &error);
+  CHECK(error);
+
+  SetExpression(predicate);
+  next = EvaluateDispatch;
 }
 
 
@@ -538,48 +564,55 @@ void EvaluateAssignment1() {
   next = GetContinue();
 }
 
+void ExtractAssignmentArguments(Object expression, Object *variable, Object *value, enum ErrorCode *error) {
+  expression = Rest(expression);
+  if (!IsPair(expression)) {
+    *error = ERROR_EVALUATE_SET_MALFORMED;
+    return;
+  }
+
+  // (set! variable ...)
+  *variable = First(expression);
+  if (!IsSymbol(*variable)) {
+    *error = ERROR_EVALUATE_SET_NON_SYMBOL;
+    return;
+  }
+
+  expression = Rest(expression);
+  if (!IsPair(expression)) {
+    // (set! variable . value)
+    *error = ERROR_EVALUATE_SET_MALFORMED;
+    return;
+  }
+
+  // (set! variable value ...)
+  *value = First(expression);
+  expression = Rest(expression);
+  if (!IsNil(expression)) {
+    // (set! variable value junk...)
+    *error = ERROR_EVALUATE_SET_TOO_MANY_ARGUMENTS;
+    return;
+  }
+}
+
+void ExtractDefinitionArguments(Object expression, Object *variable, Object *value, enum ErrorCode *error) {
+  ExtractAssignmentArguments(expression, variable, value, error);
+}
+
 void EvaluateAssignment() {
   LOG(LOG_EVALUATE, "Evaluate assignment");
 
-  Object expression = Rest(GetExpression());
-  if (IsPair(expression)) {
-    // (set! variable ...)
-    Object variable = First(expression);
-    if (IsSymbol(variable)) {
-      expression = Rest(expression);
-      if (IsPair(expression)) {
-        // (set! variable value ...)
-        Object value = First(expression);
-        expression = Rest(expression);
-        if (IsNil(expression)) {
-          // (set! variable value)
-          SetUnevaluated(variable);
-          SAVE_AND_CHECK(REGISTER_UNEVALUATED, error);
-          SetExpression(value);
-          SAVE_AND_CHECK(REGISTER_ENVIRONMENT, error);
-          SAVE_AND_CHECK(REGISTER_CONTINUE, error);
-          SetContinue(EvaluateAssignment1);
-          next = EvaluateDispatch;
-        } else {
-          // (set! variable value junk...)
-          error = ERROR_EVALUATE_SET_TOO_MANY_ARGUMENTS;
-          next = EvaluateError;
-        }
-      } else {
-        // (set! variable . value)
-        error = ERROR_EVALUATE_SET_MALFORMED;
-        next = EvaluateError;
-      }
-    } else {
-      // (set! non-variable ...)
-      error = ERROR_EVALUATE_SET_NON_SYMBOL;
-      next = EvaluateError;
-    }
-  } else {
-    // (set! . variable)
-    error = ERROR_EVALUATE_SET_MALFORMED;
-    next = EvaluateError;
-  }
+  Object variable, value;
+  ExtractAssignmentArguments(GetExpression(), &variable, &value, &error);
+  CHECK(error);
+
+  SetUnevaluated(variable);
+  SAVE_AND_CHECK(REGISTER_UNEVALUATED, error);
+  SetExpression(value);
+  SAVE_AND_CHECK(REGISTER_ENVIRONMENT, error);
+  SAVE_AND_CHECK(REGISTER_CONTINUE, error);
+  SetContinue(EvaluateAssignment1);
+  next = EvaluateDispatch;
 }
 
 void EvaluateDefinition1() {
@@ -596,47 +629,18 @@ void EvaluateDefinition1() {
 void EvaluateDefinition() {
   // (define name value)
 
-  Object expression = Rest(GetExpression());
-  // (define ...)
+  Object variable, value;
+  ExtractDefinitionArguments(GetExpression(), &variable, &value, &error);
+  CHECK(error);
 
-  if (IsPair(expression)) {
-    // (define name ...)
-    Object variable = First(expression);
-    if (IsSymbol(variable)) {
-      expression = Rest(expression);
-      if (IsPair(expression)) {
-        // (define name value ...)
-        Object value = First(expression);
-        expression = Rest(expression);
-        if (IsNil(expression)) {
-          // (define name value)
-          SetUnevaluated(variable);
-          SAVE_AND_CHECK(REGISTER_UNEVALUATED, error);
-          SetExpression(value);
-          SAVE_AND_CHECK(REGISTER_ENVIRONMENT, error);
-          SAVE_AND_CHECK(REGISTER_CONTINUE, error);
-          SetContinue(EvaluateDefinition1);
-          next = EvaluateDispatch;
-        } else {
-          // (define name value junk...)
-          error = ERROR_EVALUATE_DEFINE_TOO_MANY_ARGUMENTS;
-          next = EvaluateError;
-        }
-      } else {
-        // (define name . value)
-        error = ERROR_EVALUATE_DEFINE_MALFORMED;
-        next = EvaluateError;
-      }
-    } else {
-      // (define non-symbol ...)
-      error = ERROR_EVALUATE_DEFINE_NON_SYMBOL;
-      next = EvaluateError;
-    }
-  } else {
-    // (define . name)
-    error = ERROR_EVALUATE_DEFINE_MALFORMED;
-    next = EvaluateError;
-  }
+  // (define name value)
+  SetUnevaluated(variable);
+  SAVE_AND_CHECK(REGISTER_UNEVALUATED, error);
+  SetExpression(value);
+  SAVE_AND_CHECK(REGISTER_ENVIRONMENT, error);
+  SAVE_AND_CHECK(REGISTER_CONTINUE, error);
+  SetContinue(EvaluateDefinition1);
+  next = EvaluateDispatch;
 }
 
 void EvaluateUnknown() {
@@ -692,78 +696,117 @@ Object MakeProcedure(enum ErrorCode *error) {
 }
 
 void TestEvaluate() {
-  InitializeMemory(256, &error);
+  InitializeMemory(1024, &error);
   InitializeSymbolTable(1, &error);
 
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(BoxFixnum(42))));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(BoxFixnum(42))));
+
+#define BERT(bertscript...) #bertscript
 
   ReadObject("'(hello world)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
   ReadObject("(define x 42)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
   ReadObject("(begin 1 2 3)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
   ReadObject("(begin (define x 42) x)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
   ReadObject("(fn (x y z) z)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
   ReadObject("((fn (x y z) z) 1 2 3)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
   ReadObject("((fn () 3))", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
   ReadObject("(((fn (z) (fn () z)) 3))", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
   ReadObject("+:binary", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
   ReadObject("(+:binary 720 360)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
   ReadObject("(-:binary (+:binary 720 360) 14)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
-  ReadObject("(-:binary \"hello\" 14)", &error);
+  ReadObject(BERT((-:binary "hello" 14)), &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
   ReadObject("(-:unary 14)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
   ReadObject("(+:binary 14 3e3)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
   ReadObject("(/:binary 14 0)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
   ReadObject("(/:binary 14 7)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
   ReadObject("(remainder 3 4)", &error);
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(Evaluate(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+
+  ReadObject(BERT(
+        (begin
+         (define pair
+          (fn (left right)
+           ((fn (pair)
+             (set-pair-left! pair left)
+             (set-pair-right! pair right)
+             pair)
+            (allocate-pair))))
+         (pair 3 4))), &error);
+  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+
+  ReadObject("(list 1 2 3 4 5)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+
+  ReadObject("(evaluate '(+:binary 1 2))", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+
+  ReadObject(BERT(
+        (begin
+         (define read-entire-file
+          (fn (filename)
+           ((fn (file)
+             ((fn (buffer)
+               (copy-file-contents! file buffer)
+               (close-file! file)
+               (byte-vector->string buffer))
+              (allocate-byte-vector (file-length file))))
+            (open-binary-file-for-reading! filename))))
+         (read-entire-file "evaluate.h"))), &error);
+
+  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
   DestroyMemory();
 }

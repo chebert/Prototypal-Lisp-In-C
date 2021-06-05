@@ -13,11 +13,9 @@
 #include "symbol_table.h"
 #include "token.h"
 
-// TODO: convert to CPS
-
 // Pops the top of the Read stack
 Object PopReadStack();
-// Pushes the (read_result . nil) onto the top of the read stack. TODO: can we just push read_result?
+// Pushes the (read_result . nil) onto the top of the read stack.
 void PushReadResultOntoStack(enum ErrorCode *error);
 // Reads the next Object from token, and then source.
 const u8 *ReadNextObjectFromToken(const struct Token *token, const u8 *source, enum ErrorCode *error);

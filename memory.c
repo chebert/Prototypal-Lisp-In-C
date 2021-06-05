@@ -229,15 +229,15 @@ void TestMemory() {
   Object string = AllocateString("Hello", &error);
 
   Object vector = AllocateVector(3, &error);
-  VectorSet(vector, 0, AllocateString("Zero", &error), &error);
-  VectorSet(vector, 1, AllocateString("One", &error), &error);
-  VectorSet(vector, 2, AllocateString("Two", &error), &error);
+  UnsafeVectorSet(vector, 0, AllocateString("Zero", &error));
+  UnsafeVectorSet(vector, 1, AllocateString("One", &error));
+  UnsafeVectorSet(vector, 2, AllocateString("Two", &error));
 
   Object byte_vector = AllocateByteVector(4, &error);
-  ByteVectorSet(byte_vector, 0, 0xc, &error);
-  ByteVectorSet(byte_vector, 1, 0xa, &error);
-  ByteVectorSet(byte_vector, 2, 0xf, &error);
-  ByteVectorSet(byte_vector, 3, 0xe, &error);
+  UnsafeByteVectorSet(byte_vector, 0, 0xc);
+  UnsafeByteVectorSet(byte_vector, 1, 0xa);
+  UnsafeByteVectorSet(byte_vector, 2, 0xf);
+  UnsafeByteVectorSet(byte_vector, 3, 0xe);
 
   Object shared = MakePair(byte_vector, string, &error);
   SetRegister(REGISTER_EXPRESSION, MakePair(shared, MakePair(shared, vector, &error), &error));

@@ -42,6 +42,7 @@ Object MoveVector(Object vector) {
     return BoxVector(UnboxReference(old_header));
   }
 
+  LOG_OP(LOG_MEMORY, PrintlnObject(old_header));
   assert(IsFixnum(old_header));
   // Old: [ ..., nObjects, Object0, ... ObjectN, ... ]
 
@@ -71,40 +72,6 @@ Object UnsafeVectorRef(Object vector, u64 index) {
 void UnsafeVectorSet(Object vector, u64 index, Object value) {
   assert(IsVector(vector));
   assert(index < UnsafeVectorLength(vector));
-  memory.the_objects[UnboxReference(vector)+1 + index] = value;
-}
-
-s64 VectorLength(Object vector, enum ErrorCode *error) {
-  if (!IsVector(vector)) {
-    *error = ERROR_VECTOR_LENGTH_NON_VECTOR;
-    return 0;
-  }
-  *error = NO_ERROR;
-  return UnboxFixnum(memory.the_objects[UnboxReference(vector)]);
-}
-Object VectorRef(Object vector, u64 index, enum ErrorCode *error) {
-  if (!IsVector(vector)) {
-    *error = ERROR_VECTOR_REFERENCE_NON_VECTOR;
-    return nil;
-  }
-  if (index >= UnsafeVectorLength(vector)) {
-    *error = ERROR_VECTOR_REFERENCE_INDEX_OUT_OF_RANGE;
-    return nil;
-  }
-  *error = NO_ERROR;
-  return memory.the_objects[UnboxReference(vector)+1 + index];
-}
-
-void VectorSet(Object vector, u64 index, Object value, enum ErrorCode *error) {
-  if (!IsVector(vector)) {
-    *error = ERROR_VECTOR_SET_NON_VECTOR;
-    return;
-  }
-  if (index >= UnsafeVectorLength(vector)) {
-    *error = ERROR_VECTOR_SET_INDEX_OUT_OF_RANGE;
-    return;
-  }
-  *error = NO_ERROR;
   memory.the_objects[UnboxReference(vector)+1 + index] = value;
 }
 

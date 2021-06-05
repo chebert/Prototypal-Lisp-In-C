@@ -16,10 +16,6 @@ s64 UnsafeVectorLength(Object vector);
 Object UnsafeVectorRef(Object vector, u64 index);
 void UnsafeVectorSet(Object vector, u64 index, Object value);
 
-s64 VectorLength(Object vector, enum ErrorCode *error);
-Object VectorRef(Object vector, u64 index, enum ErrorCode *error);
-void VectorSet(Object vector, u64 index, Object value, enum ErrorCode *error);
-
 void PrintVector(Object vector);
 
 

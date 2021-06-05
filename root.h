@@ -10,9 +10,12 @@
 void InitializeRoot(enum ErrorCode *error);
 
 enum Register {
+  // The global symbol table (hash -> symbol)
   REGISTER_SYMBOL_TABLE,
+  // Registers for reading
   REGISTER_READ_STACK,
 
+  // Registers for evaluation
   REGISTER_STACK,
   REGISTER_EXPRESSION,
   REGISTER_VALUE,
@@ -21,6 +24,8 @@ enum Register {
   REGISTER_PROCEDURE,
   REGISTER_UNEVALUATED,
   REGISTER_CONTINUE,
+
+  // Total number of registers
   NUM_REGISTERS,
 };
 

@@ -1,6 +1,8 @@
 #ifndef TAG_H
 #define TAG_H
 
+#include <stdio.h>
+
 #include "c_types.h"
 #include "error.h"
 
@@ -32,6 +34,7 @@ enum Tag {
   TAG_FIXNUM, // Fixnum is a 47-bit signed integer
   TAG_PRIMITIVE_PROCEDURE, // An object holding a PrimitiveFunction
   TAG_EVALUATE_FUNCTION = TAG_PRIMITIVE_PROCEDURE, // An object holding an EvaluateFunction
+  TAG_FILE_POINTER = TAG_PRIMITIVE_PROCEDURE, // An object holding a FILE*
 
   // Reference Types (Payloads are indices into memory vectors)
   TAG_PAIR, // Pair consists of two Objects
@@ -44,6 +47,9 @@ enum Tag {
   // GC Types (Types not directly accessible)
   TAG_BROKEN_HEART, // Used to annotate referenced objects that have been moved during garbage collection.
   TAG_BLOB_HEADER, // Stores an unsigned integer which stores the size of the blob in bytes
+
+  // TODO: User defined tags (e.g. boxed references)
+  // TODO: Big integers
 
   NUM_TAGS,
 };
@@ -72,6 +78,7 @@ b64 IsSymbol(Object object);
 b64 IsPrimitiveProcedure(Object object);
 b64 IsEvaluateFunction(Object object);
 b64 IsCompoundProcedure(Object object);
+b64 IsFilePointer(Object object);
 
 // Construct boxed values given native C types
 Object BoxFixnum(s64 fixnum); // Truncates to 47 bits
@@ -79,6 +86,7 @@ Object BoxBoolean(b64 boolean);
 Object BoxReal64(real64 value);
 Object BoxPrimitiveProcedure(PrimitiveFunction proc);
 Object BoxEvaluateFunction(EvaluateFunction func);
+Object BoxFilePointer(FILE *file);
 // Construct referential data structures. References are indices.
 Object BoxPair(u64 reference);
 Object BoxVector(u64 reference);
@@ -103,6 +111,7 @@ b64    UnboxBoolean(Object object);
 real64 UnboxReal64(Object object);
 PrimitiveFunction UnboxPrimitiveProcedure(Object object);
 EvaluateFunction UnboxEvaluateFunction(Object object);
+FILE *UnboxFilePointer(Object object);
 // Unbox Pair, Vector, Byte Vector, String, Symbol
 u64 UnboxReference(Object object);
 // Unbox GC Types
