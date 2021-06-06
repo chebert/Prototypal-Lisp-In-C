@@ -90,14 +90,12 @@ void ExtractIfAlternatives(Object expression, Object *consequent, Object *altern
 static EvaluateFunction next = 0;
 static enum ErrorCode error = NO_ERROR;
 
-#define GOTO(function) \
-  do { next = (function); return; } while(0)
+#define DO do { 
+#define END } while(0)
 
-#define CHECK() \
-  do { if (error) { GOTO(EvaluateError); } } while(0)
-
-#define SAVE(reg) \
-  do { Save((reg), &error); CHECK(); } while(0)
+#define GOTO(fn)  DO  next = (fn); return;  END
+#define CHECK()   DO  if (error) { GOTO(EvaluateError); }  END
+#define SAVE(reg) DO  Save((reg), &error); CHECK();  END
 
 void DefinePrimitive(const u8 *name, PrimitiveFunction function) {
   enum ErrorCode error;
