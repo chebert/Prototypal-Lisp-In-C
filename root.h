@@ -13,6 +13,7 @@ enum Register {
   // The global symbol table (hash -> symbol)
   REGISTER_SYMBOL_TABLE,
   // Registers for reading
+  REGISTER_READ_SOURCE,
   REGISTER_READ_STACK,
 
   // Registers for evaluation

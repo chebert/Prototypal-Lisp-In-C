@@ -87,14 +87,18 @@ void ExtractDefinitionArguments(Object expression, Object *variable, Object *val
 void ExtractIfPredicate(Object expression, Object *predicate, enum ErrorCode *error);
 void ExtractIfAlternatives(Object expression, Object *consequent, Object *alternative, enum ErrorCode *error);
 
-#define CHECK(error) \
-  do { if (error) { next = EvaluateError; return; } } while(0)
-
-#define SAVE_AND_CHECK(reg, error) \
-  do { Save(reg, &error); CHECK(error); } while(0)
-
 static EvaluateFunction next = 0;
 static enum ErrorCode error = NO_ERROR;
+
+
+#define GOTO(function) \
+  do { next = (function); return; } while(0)
+
+#define CHECK(error) \
+  do { if (error) { GOTO(EvaluateError); } } while(0)
+
+#define SAVE_AND_CHECK(reg, error) \
+  do { Save((reg), &(error)); CHECK((error)); } while(0)
 
 void DefinePrimitive(const u8 *name, PrimitiveFunction function) {
   enum ErrorCode error;
@@ -105,6 +109,7 @@ void DefinePrimitive(const u8 *name, PrimitiveFunction function) {
   assert(!error);
 }
 
+// TODO: take & return error code
 Object Evaluate(Object expression) {
   SetExpression(expression);
   // Set continue to quit when evaluation finishes.
@@ -114,8 +119,10 @@ Object Evaluate(Object expression) {
   next = EvaluateDispatch;
 
   // Run the evaluation loop until quit.
-  while (next)
+  while (next) {
     next();
+    if (error) return nil;
+  }
 
   // Return the evaluated expression.
   return GetValue();
@@ -153,38 +160,28 @@ void EvaluateDispatch() {
   Object expression = GetExpression();
   LOG(LOG_EVALUATE, "Evaluating expression:");
   LOG_OP(LOG_EVALUATE, PrintlnObject(expression));
-  if (IsSelfEvaluating(expression)) {
-    next = EvaluateSelfEvaluating;
-  } else if (IsVariable(expression)) {
-    next = EvaluateVariable;
-  } else if (IsQuoted(expression)) {
-    next = EvaluateQuoted;
-  } else if (IsAssignment(expression)) {
-    next = EvaluateAssignment;
-  } else if (IsDefinition(expression)) {
-    next = EvaluateDefinition;
-  } else if (IsIf(expression)) {
-    next = EvaluateIf;
-  } else if (IsLambda(expression)) {
-    next = EvaluateLambda;
-  } else if (IsSequence(expression)) {
-    next = EvaluateBegin;
-  } else if (IsApplication(expression)) {
-    next = EvaluateApplication;
-  } else {
-    next = EvaluateUnknown;
-  }
+
+  if      (IsSelfEvaluating(expression)) GOTO(EvaluateSelfEvaluating);
+  else if (IsVariable(expression))       GOTO(EvaluateVariable);
+  else if (IsQuoted(expression))         GOTO(EvaluateQuoted);
+  else if (IsAssignment(expression))     GOTO(EvaluateAssignment);
+  else if (IsDefinition(expression))     GOTO(EvaluateDefinition);
+  else if (IsIf(expression))             GOTO(EvaluateIf);
+  else if (IsLambda(expression))         GOTO(EvaluateLambda);
+  else if (IsSequence(expression))       GOTO(EvaluateBegin);
+  else if (IsApplication(expression))    GOTO(EvaluateApplication);
+  else                                   GOTO(EvaluateUnknown);
 }
 
 b64 IsSelfEvaluating(Object expression) {
   return IsNil(expression)
-    || IsTrue(expression)
-    || IsFalse(expression)
-    || IsFixnum(expression)
-    || IsReal64(expression)
-    || IsVector(expression)
-    || IsByteVector(expression)
-    || IsString(expression);
+      || IsTrue(expression)
+      || IsFalse(expression)
+      || IsFixnum(expression)
+      || IsReal64(expression)
+      || IsVector(expression)
+      || IsByteVector(expression)
+      || IsString(expression);
 }
 
 b64 IsTaggedList(Object list, const char *tag) {
@@ -203,7 +200,7 @@ b64 IsApplication(Object expression) { return IsPair(expression); }
 void EvaluateSelfEvaluating() {
   LOG(LOG_EVALUATE, "Self evaluating");
   SetValue(GetExpression());
-  next = GetContinue();
+  GOTO(GetContinue());
 }
 void EvaluateVariable() {
   b64 found = 0;
@@ -213,11 +210,11 @@ void EvaluateVariable() {
   Object value = LookupVariableValue(GetExpression(), GetEnvironment(), &found);
   if (found) {
     SetValue(value);
-    next = GetContinue();
+    GOTO(GetContinue());
   } else {
     LOG_ERROR("Could not find %s in environment", StringCharacterBuffer(GetExpression()));
     error = ERROR_EVALUATE_UNBOUND_VARIABLE;
-    next = EvaluateError;
+    GOTO(EvaluateError);
   }
 }
 
@@ -230,16 +227,16 @@ void EvaluateQuoted() {
       // (quote object)
       Object quoted_object = First(expression);
       SetValue(quoted_object);
-      next = GetContinue();
+      GOTO(GetContinue());
     } else {
       // (quote object junk...)
       error = ERROR_EVALUATE_QUOTE_TOO_MANY_ARGUMENTS;
-      next = EvaluateError;
+      GOTO(EvaluateError);
     }
   } else {
     // (quote . object)
     error = ERROR_EVALUATE_QUOTE_MALFORMED;
-    next = EvaluateError;
+    GOTO(EvaluateError);
   }
 }
 
@@ -288,7 +285,7 @@ void EvaluateLambda() {
   LOG_OP(LOG_EVALUATE, PrintlnObject(body));
   SetValue(MakeProcedure(&error));
   CHECK(error);
-  next = GetContinue();
+  GOTO(GetContinue());
 }
 
 void EvaluateApplication() {
@@ -301,7 +298,7 @@ void EvaluateApplication() {
   LOG(LOG_EVALUATE, "Evaluating operator");
   SetExpression(Operator(GetExpression()));
   SetContinue(EvaluateApplicationOperands);
-  next = EvaluateDispatch;
+  GOTO(EvaluateDispatch);
 }
 
 void EvaluateApplicationOperands() {
@@ -316,11 +313,11 @@ void EvaluateApplicationOperands() {
   if (HasNoOperands(GetUnevaluated())) {
     // CASE: No operands
     LOG(LOG_EVALUATE, "No operands");
-    next = EvaluateApplicationDispatch;
+    GOTO(EvaluateApplicationDispatch);
   } else {
     // CASE: 1 or more operands
     SAVE_AND_CHECK(REGISTER_PROCEDURE, error);
-    next = EvaluateApplicationOperandLoop;
+    GOTO(EvaluateApplicationOperandLoop);
   }
 }
 
@@ -353,7 +350,7 @@ void EvaluateApplicationAccumulateArgument() {
   AdjoinArgument(&error);
   CHECK(error);
   SetUnevaluated(RestOperands(GetUnevaluated()));
-  next = EvaluateApplicationOperandLoop;
+  GOTO(EvaluateApplicationOperandLoop);
 }
 
 void EvaluateApplicationAccumulateLastArgument() {
@@ -362,13 +359,13 @@ void EvaluateApplicationAccumulateLastArgument() {
   AdjoinArgument(&error);
   CHECK(error);
   Restore(REGISTER_PROCEDURE);
-  next = EvaluateApplicationDispatch;
+  GOTO(EvaluateApplicationDispatch);
 }
 
 void EvaluateApplicationLastOperand() {
   LOG(LOG_EVALUATE, "last operand");
   SetContinue(EvaluateApplicationAccumulateLastArgument);
-  next = EvaluateDispatch;
+  GOTO(EvaluateDispatch);
 }
 
 void EvaluateApplicationOperandLoop() {
@@ -380,18 +377,18 @@ void EvaluateApplicationOperandLoop() {
 
   if (IsLastOperand(GetUnevaluated())) {
     // CASE: 1 argument
-    next = EvaluateApplicationLastOperand;
+    GOTO(EvaluateApplicationLastOperand);
   } else if (IsPair(GetUnevaluated())) {
     // CASE: 2+ arguments
     LOG(LOG_EVALUATE, "not the last operand");
     SAVE_AND_CHECK(REGISTER_ENVIRONMENT, error);
     SAVE_AND_CHECK(REGISTER_UNEVALUATED, error);
     SetContinue(EvaluateApplicationAccumulateArgument);
-    next = EvaluateDispatch;
+    GOTO(EvaluateDispatch);
   } else {
     // CASE: arguments are not a list
     error = ERROR_EVALUATE_APPLICATION_DOTTED_LIST;
-    next = EvaluateError;
+    GOTO(EvaluateError);
   }
 }
 
@@ -403,7 +400,7 @@ void EvaluateApplicationDispatch() {
     SetValue(ApplyPrimitiveProcedure(proc, GetArgumentList(), &error));
     CHECK(error);
     Restore(REGISTER_CONTINUE);
-    next = GetContinue();
+    GOTO(GetContinue());
   } else if (IsCompoundProcedure(proc)) {
     // Compound-procedure application
     SetUnevaluated(ProcedureParameters(proc));
@@ -414,10 +411,10 @@ void EvaluateApplicationDispatch() {
 
     proc = GetProcedure();
     SetUnevaluated(ProcedureBody(proc));
-    next = EvaluateSequence;
+    GOTO(EvaluateSequence);
   } else {
     error = ERROR_EVALUATE_UNKNOWN_PROCEDURE_TYPE;
-    next = EvaluateError;
+    GOTO(EvaluateError);
   }
 }
 
@@ -428,15 +425,15 @@ void EvaluateBegin() {
     // (begin expressions...)
     SetUnevaluated(expression);
     SAVE_AND_CHECK(REGISTER_CONTINUE, error);
-    next = EvaluateSequence;
+    GOTO(EvaluateSequence);
   } else if (IsNil(expression)) {
     // (begin)
     error = ERROR_EVALUATE_BEGIN_EMPTY;
-    next = EvaluateError;
+    GOTO(EvaluateError);
   } else {
     // (begin . junk)
     error = ERROR_EVALUATE_BEGIN_MALFORMED;
-    next = EvaluateError;
+    GOTO(EvaluateError);
   }
 }
 
@@ -446,12 +443,12 @@ void EvaluateSequenceContinue() {
   Restore(REGISTER_UNEVALUATED);
 
   SetUnevaluated(RestExpressions(GetUnevaluated()));
-  next = EvaluateSequence;
+  GOTO(EvaluateSequence);
 }
 void EvaluateSequenceLastExpression() {
   LOG(LOG_EVALUATE, "Evaluate sequence, last expression");
   Restore(REGISTER_CONTINUE);
-  next = EvaluateDispatch;
+  GOTO(EvaluateDispatch);
 }
 
 void EvaluateSequence() {
@@ -464,18 +461,18 @@ void EvaluateSequence() {
 
     if (IsLastExpression(unevaluated)) {
       // Case: 1 expression left to evaluate
-      next = EvaluateSequenceLastExpression;
+      GOTO(EvaluateSequenceLastExpression);
     } else {
       // Case: 2+ expressions left to evaluate
       SAVE_AND_CHECK(REGISTER_UNEVALUATED, error);
       SAVE_AND_CHECK(REGISTER_ENVIRONMENT, error);
       SetContinue(EvaluateSequenceContinue);
-      next = EvaluateDispatch;
+      GOTO(EvaluateDispatch);
     }
   } else {
     // Case: 0 expressions in sequence
     error = ERROR_EVALUATE_SEQUENCE_EMPTY;
-    next = EvaluateError;
+    GOTO(EvaluateError);
   }
 }
 
@@ -528,7 +525,7 @@ void EvaluateIfDecide() {
   // (if predicate consequent alternative)
   // expression := (alternative)
   SetExpression(IsTruthy(GetValue()) ? consequent : alternative);
-  next = EvaluateDispatch;
+  GOTO(EvaluateDispatch);
 }
 
 void EvaluateIf() {
@@ -543,7 +540,7 @@ void EvaluateIf() {
   CHECK(error);
 
   SetExpression(predicate);
-  next = EvaluateDispatch;
+  GOTO(EvaluateDispatch);
 }
 
 
@@ -561,7 +558,7 @@ void EvaluateAssignment1() {
   CHECK(error);
   // Return the symbol 'ok as the result of an assignment
   SetValue(FindSymbol("ok"));
-  next = GetContinue();
+  GOTO(GetContinue());
 }
 
 void ExtractAssignmentArguments(Object expression, Object *variable, Object *value, enum ErrorCode *error) {
@@ -612,7 +609,7 @@ void EvaluateAssignment() {
   SAVE_AND_CHECK(REGISTER_ENVIRONMENT, error);
   SAVE_AND_CHECK(REGISTER_CONTINUE, error);
   SetContinue(EvaluateAssignment1);
-  next = EvaluateDispatch;
+  GOTO(EvaluateDispatch);
 }
 
 void EvaluateDefinition1() {
@@ -623,7 +620,7 @@ void EvaluateDefinition1() {
   CHECK(error);
   // Return the symbol name as the result of the definition.
   SetValue(GetUnevaluated());
-  next = GetContinue();
+  GOTO(GetContinue());
 }
 
 void EvaluateDefinition() {
@@ -640,7 +637,7 @@ void EvaluateDefinition() {
   SAVE_AND_CHECK(REGISTER_ENVIRONMENT, error);
   SAVE_AND_CHECK(REGISTER_CONTINUE, error);
   SetContinue(EvaluateDefinition1);
-  next = EvaluateDispatch;
+  GOTO(EvaluateDispatch);
 }
 
 void EvaluateUnknown() {
@@ -648,12 +645,12 @@ void EvaluateUnknown() {
   LOG_OP(LOG_EVALUATE, PrintlnObject(GetExpression()));
 
   error = ERROR_EVALUATE_UNKNOWN_EXPRESSION;
-  next = EvaluateError;
+  GOTO(EvaluateError);
 }
 
 void EvaluateError() {
   LOG_ERROR("%s", ErrorCodeString(error));
-  next = 0;
+  GOTO(0);
 }
 
 Object ApplyPrimitiveProcedure(Object procedure, Object arguments, enum ErrorCode *error) { 

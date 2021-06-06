@@ -318,7 +318,7 @@ DECLARE_PRIMITIVE(PrimitiveCopyFileContents, arguments, error) {
   // TODO: ByteVectorBuffer
   s64 num_bytes_read = fread(StringCharacterBuffer(byte_vector), 1, length, f);
   if (ferror(f)) {
-    *error = ERROR_READING_FILE;
+    *error = ERROR_COULD_NOT_READ_FILE;
   }
   // Null-terminate
   UnsafeByteVectorSet(byte_vector, length, 0);
@@ -348,12 +348,14 @@ DECLARE_PRIMITIVE(PrimitiveAllocateByteVector, arguments, error) {
 
   return AllocateByteVector(UnboxFixnum(num_bytes), error);
 }
+
 DECLARE_PRIMITIVE(PrimitiveIsByteVector, arguments, error) {
   Object byte_vector;
   Extract1Argument(&arguments, &byte_vector, error);
   CHECK(error);
   return BoxBoolean(IsByteVector(byte_vector));
 }
+
 DECLARE_PRIMITIVE(PrimitiveByteVectorLength, arguments, error) {
   Object byte_vector;
   Extract1Argument(&arguments, &byte_vector, error);
@@ -361,6 +363,7 @@ DECLARE_PRIMITIVE(PrimitiveByteVectorLength, arguments, error) {
   if (!IsByteVector(byte_vector)) return InvalidArgumentError(error);
   return BoxFixnum(UnsafeByteVectorLength(byte_vector));
 }
+
 DECLARE_PRIMITIVE(PrimitiveByteVectorSet, arguments, error) {
   Object byte_vector, index, value;
   Extract3Arguments(&arguments, &byte_vector, &index, &value, error);
@@ -378,6 +381,7 @@ DECLARE_PRIMITIVE(PrimitiveByteVectorSet, arguments, error) {
   UnsafeByteVectorSet(byte_vector, index_value, value);
   return FindSymbol("ok");
 }
+
 DECLARE_PRIMITIVE(PrimitiveByteVectorRef, arguments, error) {
   Object byte_vector, index;
   Extract2Arguments(&arguments, &byte_vector, &index, error);
@@ -394,6 +398,7 @@ DECLARE_PRIMITIVE(PrimitiveByteVectorRef, arguments, error) {
 
   return UnsafeByteVectorRef(byte_vector, UnboxFixnum(index));
 }
+
 DECLARE_PRIMITIVE(PrimitiveSymbolToString, arguments, error) {
   Object symbol;
   Extract1Argument(&arguments, &symbol, error);
@@ -401,6 +406,7 @@ DECLARE_PRIMITIVE(PrimitiveSymbolToString, arguments, error) {
   if (!IsSymbol(symbol)) return InvalidArgumentError(error);
   return BoxString(UnboxReference(symbol));
 }
+
 DECLARE_PRIMITIVE(PrimitiveIntern, arguments, error) {
   Object string;
   Extract1Argument(&arguments, &string, error);
@@ -408,6 +414,7 @@ DECLARE_PRIMITIVE(PrimitiveIntern, arguments, error) {
   if (!IsString(string)) return InvalidArgumentError(error);
   return InternSymbol(StringCharacterBuffer(string), error);
 }
+
 DECLARE_PRIMITIVE(PrimitiveUnintern, arguments, error) {
   Object string;
   Extract1Argument(&arguments, &string, error);
@@ -416,6 +423,7 @@ DECLARE_PRIMITIVE(PrimitiveUnintern, arguments, error) {
   UninternSymbol(StringCharacterBuffer(string));
   return FindSymbol("ok");
 }
+
 DECLARE_PRIMITIVE(PrimitiveFindSymbol, arguments, error) {
   Object string;
   Extract1Argument(&arguments, &string, error);
@@ -423,6 +431,7 @@ DECLARE_PRIMITIVE(PrimitiveFindSymbol, arguments, error) {
   if (!IsString(string)) return InvalidArgumentError(error);
   return FindSymbol(StringCharacterBuffer(string));
 }
+
 DECLARE_PRIMITIVE(PrimitiveAllocateVector, arguments, error) {
   Object num_objects;
   Extract1Argument(&arguments, &num_objects, error);
@@ -431,12 +440,14 @@ DECLARE_PRIMITIVE(PrimitiveAllocateVector, arguments, error) {
 
   return AllocateVector(UnboxFixnum(num_objects), error);
 }
+
 DECLARE_PRIMITIVE(PrimitiveIsVector, arguments, error) {
   Object vector;
   Extract1Argument(&arguments, &vector, error);
   CHECK(error);
   return BoxBoolean(IsVector(vector));
 }
+
 DECLARE_PRIMITIVE(PrimitiveVectorLength, arguments, error) {
   Object vector;
   Extract1Argument(&arguments, &vector, error);
@@ -444,6 +455,7 @@ DECLARE_PRIMITIVE(PrimitiveVectorLength, arguments, error) {
   if (!IsVector(vector)) return InvalidArgumentError(error);
   return BoxFixnum(UnsafeVectorLength(vector));
 }
+
 DECLARE_PRIMITIVE(PrimitiveVectorSet, arguments, error) {
   Object vector, index, value;
   Extract3Arguments(&arguments, &vector, &index, &value, error);
@@ -460,6 +472,7 @@ DECLARE_PRIMITIVE(PrimitiveVectorSet, arguments, error) {
   UnsafeVectorSet(vector, index_value, value);
   return FindSymbol("ok");
 }
+
 DECLARE_PRIMITIVE(PrimitiveVectorRef, arguments, error) {
   Object vector, index;
   Extract2Arguments(&arguments, &vector, &index, error);

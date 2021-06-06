@@ -45,11 +45,12 @@
   X("open-binary-file-for-reading!", PrimitiveOpenBinaryFileForReading) \
   X("file-length", PrimitiveFileLength) \
   X("copy-file-contents!", PrimitiveCopyFileContents) \
-  X("close-file!", PrimitiveCloseFile)
+  X("close-file!", PrimitiveCloseFile) \
 
-// TODO: vector, byte-vector
+#define DECLARE_PRIMITIVE(name, arguments_name, error_name)  \
+  Object name(Object arguments_name, enum ErrorCode *error_name)
 
-#define X(str, primitive_name) Object primitive_name(Object arguments, enum ErrorCode *error);
+#define X(str, primitive_name) DECLARE_PRIMITIVE(primitive_name, arguments, error);
   PRIMITIVES
 #undef X
 
