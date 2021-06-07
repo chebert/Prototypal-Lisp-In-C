@@ -21,12 +21,16 @@ b64 IsAssignment(Object expression);
 b64 IsDefinition(Object expression);
 b64 IsIf(Object expression);
 b64 IsLambda(Object expression);
-b64 IsSequence(Object expression);
+b64 IsBegin(Object expression);
 b64 IsApplication(Object expression);
 
 Object EvaluateInAFreshEnvironment(Object expression);
 
 // EvaluateFunctions
+// REGISTER_EXPRESSION (IN) is evaluated
+// REGISTER_VALUE (OUT) holds the value
+// REGISTER_CONTINUE (IN) where to continue execution when complete.
+// Stack (...)
 void EvaluateDispatch();
 void EvaluateSelfEvaluating();
 void EvaluateVariable();
@@ -36,24 +40,54 @@ void EvaluateDefinition();
 void EvaluateIf();
 void EvaluateLambda();
 void EvaluateBegin();
-void EvaluateSequence();
 void EvaluateApplication();
-void EvaluateApplicationOperands();
-void EvaluateApplicationDispatch();
-void EvaluateUnknown();
 
-void EvaluateApplicationOperandLoop();
-void EvaluateApplicationAccumulateArgument();
-void EvaluateApplicationAccumulateLastArgument();
-void EvaluateApplicationLastOperand();
-
-void EvaluateSequenceContinue();
+// REGISTER_UNEVALUATED (IN) holds a list of expressions to evaluate
+void EvaluateSequence();
+// Stack (continue ...)
 void EvaluateSequenceLastExpression();
+// Stack (environment unevaluated ...) 
+//   environment: environment of the sequence
+//   unevaluated: remaining expressions in sequence
+void EvaluateSequenceContinue();
 
+// REGISTER_VALUE (IN) holds the evaluated operator
+// Stack (unevaluated environment ...)
+//   unevaluted: holds the unevaluated operands
+//   environemnt: holds the environment of the application
+void EvaluateApplicationOperands();
+
+// REGISTER_PROCEDURE (IN) holds the procedure
+// Stack (continue ...) 
+//   continue: holds where to resume execution when the application is complete.
+void EvaluateApplicationDispatch();
+
+// REGISTER_UNEVALUATED (IN) The unevaluated arguments.
+void EvaluateApplicationOperandLoop();
+
+// REGISTER_UNEVALUATED (IN/OUT) The unevaluated arguments.
+// REGISTER_ARGUMENT_LIST (IN/OUT) The evaluated arguments.
+// Stack (unevaluated environment argument_list ...)
+//   unevaluated: the unevaluated arguments
+//   envrionment: environment of the application
+//   argument_list: the evaluated arguments
+void EvaluateApplicationAccumulateArgument();
+
+// REGISTER_ARGUMENT_LIST (IN/OUT) The evaluated arguments.
+// Stack (argument_list procedure ...)
+//   argument_list: the evaluated arguments
+//   procedure: the evaluated operator
+void EvaluateApplicationAccumulateLastArgument();
+
+// Stack (continue environment expression ...)
+//   continue: where to resume when if expression is fully evaluated
+//   environment: environment of the if expression
+//   expression: (if predicate consequent alternative)
 void EvaluateIfDecide();
 void EvaluateAssignment1();
 void EvaluateDefinition1();
 
+void EvaluateUnknown();
 void EvaluateError();
 
 b64 IsList(Object list);
@@ -81,21 +115,34 @@ Object FirstExpression(Object sequence);
 Object RestExpressions(Object sequence);
 b64 IsLastExpression(Object sequence);
 
+// TODO: Move to expression.h or something
+void ExtractAssignmentOrDefinitionArguments(Object expression, Object *variable, Object *value, 
+    enum ErrorCode malformed,
+    enum ErrorCode variable_is_non_symbol,
+    enum ErrorCode too_many_arguments,
+    enum ErrorCode *error);
 void ExtractAssignmentArguments(Object expression, Object *variable, Object *value, enum ErrorCode *error);
 void ExtractLambdaArguments(Object expression, Object *parameters, Object *body, enum ErrorCode *error);
 void ExtractDefinitionArguments(Object expression, Object *variable, Object *value, enum ErrorCode *error);
 void ExtractIfPredicate(Object expression, Object *predicate, enum ErrorCode *error);
 void ExtractIfAlternatives(Object expression, Object *consequent, Object *alternative, enum ErrorCode *error);
+void ExtractQuoted(Object expression, Object *quoted_expression, enum ErrorCode *error);
+void ExtractBegin(Object expression, Object *sequence, enum ErrorCode *error);
 
 static EvaluateFunction next = 0;
 static enum ErrorCode error = NO_ERROR;
 
-#define DO do { 
-#define END } while(0)
+#define BEGIN do { 
+#define END   } while(0)
 
-#define GOTO(fn)  DO  next = (fn); return;  END
-#define CHECK()   DO  if (error) { GOTO(EvaluateError); }  END
-#define SAVE(reg) DO  Save((reg), &error); CHECK();  END
+// For Evaluate*() functions
+#define GOTO(dest)  BEGIN  next = (dest); return;  END
+#define BRANCH(test, dest)  BEGIN  if (test) GOTO(dest);  END
+#define ERROR(error_code) BEGIN  error = error_code; GOTO(EvaluateError);  END
+#define CONTINUE GOTO(GetContinue())
+
+#define CHECK(op)  BEGIN  (op); if (error) { GOTO(EvaluateError); }  END
+#define SAVE(reg)  BEGIN  CHECK(Save((reg), &error));  END
 
 void DefinePrimitive(const u8 *name, PrimitiveFunction function) {
   enum ErrorCode error;
@@ -158,16 +205,16 @@ void EvaluateDispatch() {
   LOG(LOG_EVALUATE, "Evaluating expression:");
   LOG_OP(LOG_EVALUATE, PrintlnObject(expression));
 
-  if      (IsSelfEvaluating(expression)) GOTO(EvaluateSelfEvaluating);
-  else if (IsVariable(expression))       GOTO(EvaluateVariable);
-  else if (IsQuoted(expression))         GOTO(EvaluateQuoted);
-  else if (IsAssignment(expression))     GOTO(EvaluateAssignment);
-  else if (IsDefinition(expression))     GOTO(EvaluateDefinition);
-  else if (IsIf(expression))             GOTO(EvaluateIf);
-  else if (IsLambda(expression))         GOTO(EvaluateLambda);
-  else if (IsSequence(expression))       GOTO(EvaluateBegin);
-  else if (IsApplication(expression))    GOTO(EvaluateApplication);
-  else                                   GOTO(EvaluateUnknown);
+  BRANCH(IsSelfEvaluating(expression), EvaluateSelfEvaluating);
+  BRANCH(IsVariable(expression),       EvaluateVariable);
+  BRANCH(IsQuoted(expression),         EvaluateQuoted);
+  BRANCH(IsAssignment(expression),     EvaluateAssignment);
+  BRANCH(IsDefinition(expression),     EvaluateDefinition);
+  BRANCH(IsIf(expression),             EvaluateIf);
+  BRANCH(IsLambda(expression),         EvaluateLambda);
+  BRANCH(IsBegin(expression),          EvaluateBegin);
+  BRANCH(IsApplication(expression),    EvaluateApplication);
+  GOTO(EvaluateUnknown);
 }
 
 b64 IsSelfEvaluating(Object expression) {
@@ -176,113 +223,67 @@ b64 IsSelfEvaluating(Object expression) {
       || IsFalse(expression)
       || IsFixnum(expression)
       || IsReal64(expression)
+      || IsString(expression)
+      // NOTE: No syntax for these right now:
       || IsVector(expression)
-      || IsByteVector(expression)
-      || IsString(expression);
+      || IsByteVector(expression);
 }
 
 b64 IsTaggedList(Object list, const char *tag) {
-  return IsPair(list) && FindSymbol(tag) == Car(list);
+  return IsPair(list) && FindSymbol(tag) == First(list);
 }
 
 b64 IsVariable(Object expression)    { return IsSymbol(expression); }
+b64 IsApplication(Object expression) { return IsPair(expression); }
 b64 IsQuoted(Object expression)      { return IsTaggedList(expression, "quote"); }
 b64 IsAssignment(Object expression)  { return IsTaggedList(expression, "set!"); }
 b64 IsDefinition(Object expression)  { return IsTaggedList(expression, "define"); }
 b64 IsIf(Object expression)          { return IsTaggedList(expression, "if"); }
-b64 IsSequence(Object expression)    { return IsTaggedList(expression, "begin"); }
+b64 IsBegin(Object expression)       { return IsTaggedList(expression, "begin"); }
 b64 IsLambda(Object expression)      { return IsTaggedList(expression, "fn"); }
-b64 IsApplication(Object expression) { return IsPair(expression); }
 
 void EvaluateSelfEvaluating() {
   LOG(LOG_EVALUATE, "Self evaluating");
   SetValue(GetExpression());
-  GOTO(GetContinue());
+  CONTINUE;
 }
+
 void EvaluateVariable() {
   b64 found = 0;
   LOG(LOG_EVALUATE, "Looking up variable value in environment: ");
   LOG_OP(LOG_EVALUATE, PrintlnObject(GetExpression()));
   LOG_OP(LOG_EVALUATE, PrintlnObject(GetEnvironment()));
   Object value = LookupVariableValue(GetExpression(), GetEnvironment(), &found);
-  if (found) {
-    SetValue(value);
-    GOTO(GetContinue());
-  } else {
+  if (!found) {
     LOG_ERROR("Could not find %s in environment", StringCharacterBuffer(GetExpression()));
-    error = ERROR_EVALUATE_UNBOUND_VARIABLE;
-    GOTO(EvaluateError);
+    ERROR(ERROR_EVALUATE_UNBOUND_VARIABLE);
   }
+
+  SetValue(value);
+  CONTINUE;
 }
 
 void EvaluateQuoted() {
   LOG(LOG_EVALUATE, "Quoted expression");
-  Object expression = Rest(GetExpression());
-  if (IsPair(expression)) {
-    // (quote object ...)
-    if (IsNil(Rest(expression))) {
-      // (quote object)
-      Object quoted_object = First(expression);
-      SetValue(quoted_object);
-      GOTO(GetContinue());
-    } else {
-      // (quote object junk...)
-      error = ERROR_EVALUATE_QUOTE_TOO_MANY_ARGUMENTS;
-      GOTO(EvaluateError);
-    }
-  } else {
-    // (quote . object)
-    error = ERROR_EVALUATE_QUOTE_MALFORMED;
-    GOTO(EvaluateError);
-  }
+  Object quoted_expression;
+  CHECK(ExtractQuoted(GetExpression(), &quoted_expression, &error));
+
+  SetValue(quoted_expression);
+  CONTINUE;
 }
 
-void ExtractLambdaArguments(Object expression, Object *parameters, Object *body, enum ErrorCode *error) {
-  expression = Rest(expression);
-  // (lambda ...)
-
-  if (!IsPair(expression)) {
-    // (lambda . parameters)
-    *error = ERROR_EVALUATE_LAMBDA_MALFORMED;
-    return;
-  }
-
-  // (lambda parameters ...)
-  *parameters = First(expression);
-  if (!IsList(*parameters)) {
-    // (lambda non-list)
-    *error = ERROR_EVALUATE_LAMBDA_PARAMETERS_SHOULD_BE_LIST;
-    return;
-  }
-
-  // (lambda parameters body)
-  *body = Rest(expression);
-  if (IsNil(*body)) {
-    // (lambda parameters)
-    *error = ERROR_EVALUATE_LAMBDA_BODY_SHOULD_BE_NON_EMPTY;
-    return;
-  }
-
-  if (!IsPair(*body)) {
-    // (lambda parameters . non-pair)
-    *error = ERROR_EVALUATE_LAMBDA_BODY_MALFORMED;
-    return;
-  }
-}
 
 void EvaluateLambda() {
   LOG(LOG_EVALUATE, "Lambda expression");
   Object parameters, body;
-  ExtractLambdaArguments(GetExpression(), &parameters, &body, &error);
-  CHECK();
+  CHECK(ExtractLambdaArguments(GetExpression(), &parameters, &body, &error));
 
   SetUnevaluated(parameters);
   SetExpression(body);
-  LOG(LOG_EVALUATE, "Lambda body: ");
-  LOG_OP(LOG_EVALUATE, PrintlnObject(body));
-  SetValue(MakeProcedure(&error));
-  CHECK();
-  GOTO(GetContinue());
+  Object procedure;
+  CHECK(procedure = MakeProcedure(&error));
+  SetValue(procedure);
+  CONTINUE;
 }
 
 void EvaluateApplication() {
@@ -292,7 +293,6 @@ void EvaluateApplication() {
   SetUnevaluated(Operands(GetExpression()));
   SAVE(REGISTER_UNEVALUATED);
   // Evaluate the operator
-  LOG(LOG_EVALUATE, "Evaluating operator");
   SetExpression(Operator(GetExpression()));
   SetContinue(EvaluateApplicationOperands);
   GOTO(EvaluateDispatch);
@@ -307,45 +307,18 @@ void EvaluateApplicationOperands() {
   SetArgumentList(EmptyArgumentList());
 
   LOG(LOG_EVALUATE, "Evaluating operands");
-  if (HasNoOperands(GetUnevaluated())) {
-    // CASE: No operands
-    LOG(LOG_EVALUATE, "No operands");
-    GOTO(EvaluateApplicationDispatch);
-  } else {
-    // CASE: 1 or more operands
-    SAVE(REGISTER_PROCEDURE);
-    GOTO(EvaluateApplicationOperandLoop);
-  }
+  BRANCH(HasNoOperands(GetUnevaluated()), EvaluateApplicationDispatch);
+
+  // CASE: 1 or more operands
+  SAVE(REGISTER_PROCEDURE);
+  GOTO(EvaluateApplicationOperandLoop);
 }
-
-Object SetLastCdr(Object list, Object last_pair) {
-  assert(IsList(list));
-  assert(IsPair(last_pair));
-  // List is empty. The resulting list is just last_pair.
-  if (IsNil(list)) return last_pair;
-
-  Object head = list;
-  for (; IsPair(Cdr(list)); list = Cdr(list))
-    ;
-  SetCdr(list, last_pair);
-  return head;
-}
-
-void AdjoinArgument(enum ErrorCode *error) {
-  Object last_pair = AllocatePair(error);
-  if (*error) return;
-
-  SetCar(last_pair, GetValue());
-  SetArgumentList(SetLastCdr(GetArgumentList(), last_pair));
-}
-
 void EvaluateApplicationAccumulateArgument() {
   LOG(LOG_EVALUATE, "Accumulating argument");
   Restore(REGISTER_UNEVALUATED);
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_ARGUMENT_LIST);
-  AdjoinArgument(&error);
-  CHECK();
+  CHECK(AdjoinArgument(&error));
   SetUnevaluated(RestOperands(GetUnevaluated()));
   GOTO(EvaluateApplicationOperandLoop);
 }
@@ -353,16 +326,9 @@ void EvaluateApplicationAccumulateArgument() {
 void EvaluateApplicationAccumulateLastArgument() {
   LOG(LOG_EVALUATE, "Accumulating last argument");
   Restore(REGISTER_ARGUMENT_LIST);
-  AdjoinArgument(&error);
-  CHECK();
+  CHECK(AdjoinArgument(&error));
   Restore(REGISTER_PROCEDURE);
   GOTO(EvaluateApplicationDispatch);
-}
-
-void EvaluateApplicationLastOperand() {
-  LOG(LOG_EVALUATE, "last operand");
-  SetContinue(EvaluateApplicationAccumulateLastArgument);
-  GOTO(EvaluateDispatch);
 }
 
 void EvaluateApplicationOperandLoop() {
@@ -372,9 +338,11 @@ void EvaluateApplicationOperandLoop() {
 
   SetExpression(FirstOperand(GetUnevaluated()));
 
+  // CASE: Last argument
   if (IsLastOperand(GetUnevaluated())) {
-    // CASE: 1 argument
-    GOTO(EvaluateApplicationLastOperand);
+    LOG(LOG_EVALUATE, "last operand");
+    SetContinue(EvaluateApplicationAccumulateLastArgument);
+    GOTO(EvaluateDispatch);
   } else if (IsPair(GetUnevaluated())) {
     // CASE: 2+ arguments
     LOG(LOG_EVALUATE, "not the last operand");
@@ -382,11 +350,10 @@ void EvaluateApplicationOperandLoop() {
     SAVE(REGISTER_UNEVALUATED);
     SetContinue(EvaluateApplicationAccumulateArgument);
     GOTO(EvaluateDispatch);
-  } else {
-    // CASE: arguments are not a list
-    error = ERROR_EVALUATE_APPLICATION_DOTTED_LIST;
-    GOTO(EvaluateError);
   }
+
+  // CASE: arguments are not a list
+  ERROR(ERROR_EVALUATE_APPLICATION_DOTTED_LIST);
 }
 
 void EvaluateApplicationDispatch() {
@@ -394,44 +361,32 @@ void EvaluateApplicationDispatch() {
   Object proc = GetProcedure();
   if (IsPrimitiveProcedure(proc)) {
     // Primitive-procedure application
-    SetValue(ApplyPrimitiveProcedure(proc, GetArgumentList(), &error));
-    CHECK();
+    CHECK(SetValue(ApplyPrimitiveProcedure(proc, GetArgumentList(), &error)));
     Restore(REGISTER_CONTINUE);
-    GOTO(GetContinue());
+    CONTINUE;
   } else if (IsCompoundProcedure(proc)) {
     // Compound-procedure application
     SetUnevaluated(ProcedureParameters(proc));
     SetEnvironment(ProcedureEnvironment(proc));
     LOG(LOG_EVALUATE, "Extending the environment");
-    ExtendEnvironment(&error);
-    CHECK();
+    CHECK(ExtendEnvironment(&error));
 
     proc = GetProcedure();
     SetUnevaluated(ProcedureBody(proc));
     GOTO(EvaluateSequence);
-  } else {
-    error = ERROR_EVALUATE_UNKNOWN_PROCEDURE_TYPE;
-    GOTO(EvaluateError);
   }
+
+  ERROR(ERROR_EVALUATE_UNKNOWN_PROCEDURE_TYPE);
 }
 
 void EvaluateBegin() {
   LOG(LOG_EVALUATE, "Evaluate begin");
-  Object expression = Rest(GetExpression());
-  if (IsPair(expression)) {
-    // (begin expressions...)
-    SetUnevaluated(expression);
-    SAVE(REGISTER_CONTINUE);
-    GOTO(EvaluateSequence);
-  } else if (IsNil(expression)) {
-    // (begin)
-    error = ERROR_EVALUATE_BEGIN_EMPTY;
-    GOTO(EvaluateError);
-  } else {
-    // (begin . junk)
-    error = ERROR_EVALUATE_BEGIN_MALFORMED;
-    GOTO(EvaluateError);
-  }
+  Object sequence;
+  CHECK(ExtractBegin(GetExpression(), &sequence, &error));
+
+  SetUnevaluated(sequence);
+  SAVE(REGISTER_CONTINUE);
+  GOTO(EvaluateSequence);
 }
 
 void EvaluateSequenceContinue() {
@@ -456,58 +411,20 @@ void EvaluateSequence() {
   if (IsPair(unevaluated)) {
     SetExpression(FirstExpression(unevaluated));
 
-    if (IsLastExpression(unevaluated)) {
-      // Case: 1 expression left to evaluate
-      GOTO(EvaluateSequenceLastExpression);
-    } else {
-      // Case: 2+ expressions left to evaluate
-      SAVE(REGISTER_UNEVALUATED);
-      SAVE(REGISTER_ENVIRONMENT);
-      SetContinue(EvaluateSequenceContinue);
-      GOTO(EvaluateDispatch);
-    }
-  } else {
-    // Case: 0 expressions in sequence
-    error = ERROR_EVALUATE_SEQUENCE_EMPTY;
-    GOTO(EvaluateError);
+    // Case: 1 expression left to evaluate
+    BRANCH(IsLastExpression(unevaluated), EvaluateSequenceLastExpression);
+
+    // Case: 2+ expressions left to evaluate
+    SAVE(REGISTER_UNEVALUATED);
+    SAVE(REGISTER_ENVIRONMENT);
+    SetContinue(EvaluateSequenceContinue);
+    GOTO(EvaluateDispatch);
   }
+
+  // Case: 0 expressions in sequence
+  ERROR(ERROR_EVALUATE_SEQUENCE_EMPTY);
 }
 
-void ExtractIfPredicate(Object expression, Object *predicate, enum ErrorCode *error) {
-  expression = Rest(expression);
-  if (!IsPair(expression)) {
-    *error = ERROR_EVALUATE_IF_MALFORMED;
-    return;
-  }
-
-  *predicate = First(expression);
-}
-
-void ExtractIfAlternatives(Object expression, Object *consequent, Object *alternative, enum ErrorCode *error) {
-  expression = Rest(Rest(expression));
-  if (!IsPair(expression)) {
-    // (if predicate . expression)
-    *error = ERROR_EVALUATE_IF_MALFORMED;
-    return;
-  }
-
-  // (if predicate consequent ...)
-  *consequent = First(expression);
-  expression = Rest(expression);
-  if (!IsPair(expression)) {
-    // (if predicate expression . alternative)
-    *error = ERROR_EVALUATE_IF_MALFORMED;
-    return;
-  }
-
-  // (if predicate consequent alternative ...)
-  *alternative = First(expression);
-  if (!IsNil(Rest(expression))) {
-    // (if predicate consequent alternative junk ...)
-    *error = ERROR_EVALUATE_IF_TOO_MANY_ARGUMENTS;
-    return;
-  }
-}
 
 void EvaluateIfDecide() {
   LOG(LOG_EVALUATE, "Evaluate if, condition already evaluated");
@@ -516,11 +433,8 @@ void EvaluateIfDecide() {
   Restore(REGISTER_EXPRESSION);
 
   Object consequent, alternative;
-  ExtractIfAlternatives(GetExpression(), &consequent, &alternative, &error);
-  CHECK();
+  CHECK(ExtractIfAlternatives(GetExpression(), &consequent, &alternative, &error));
 
-  // (if predicate consequent alternative)
-  // expression := (alternative)
   SetExpression(IsTruthy(GetValue()) ? consequent : alternative);
   GOTO(EvaluateDispatch);
 }
@@ -533,8 +447,7 @@ void EvaluateIf() {
   SetContinue(EvaluateIfDecide);
 
   Object predicate;
-  ExtractIfPredicate(GetExpression(), &predicate, &error);
-  CHECK();
+  CHECK(ExtractIfPredicate(GetExpression(), &predicate, &error));
 
   SetExpression(predicate);
   GOTO(EvaluateDispatch);
@@ -547,58 +460,18 @@ void EvaluateAssignment1() {
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_UNEVALUATED);
 
-  SetVariableValue(
-      GetUnevaluated(),
-      GetValue(),
-      GetEnvironment(),
-      &error);
-  CHECK();
+  CHECK(SetVariableValue(GetUnevaluated(), GetValue(), GetEnvironment(), &error));
   // Return the symbol 'ok as the result of an assignment
   SetValue(FindSymbol("ok"));
-  GOTO(GetContinue());
+  CONTINUE;
 }
 
-void ExtractAssignmentArguments(Object expression, Object *variable, Object *value, enum ErrorCode *error) {
-  expression = Rest(expression);
-  if (!IsPair(expression)) {
-    *error = ERROR_EVALUATE_SET_MALFORMED;
-    return;
-  }
-
-  // (set! variable ...)
-  *variable = First(expression);
-  if (!IsSymbol(*variable)) {
-    *error = ERROR_EVALUATE_SET_NON_SYMBOL;
-    return;
-  }
-
-  expression = Rest(expression);
-  if (!IsPair(expression)) {
-    // (set! variable . value)
-    *error = ERROR_EVALUATE_SET_MALFORMED;
-    return;
-  }
-
-  // (set! variable value ...)
-  *value = First(expression);
-  expression = Rest(expression);
-  if (!IsNil(expression)) {
-    // (set! variable value junk...)
-    *error = ERROR_EVALUATE_SET_TOO_MANY_ARGUMENTS;
-    return;
-  }
-}
-
-void ExtractDefinitionArguments(Object expression, Object *variable, Object *value, enum ErrorCode *error) {
-  ExtractAssignmentArguments(expression, variable, value, error);
-}
 
 void EvaluateAssignment() {
   LOG(LOG_EVALUATE, "Evaluate assignment");
 
   Object variable, value;
-  ExtractAssignmentArguments(GetExpression(), &variable, &value, &error);
-  CHECK();
+  CHECK(ExtractAssignmentArguments(GetExpression(), &variable, &value, &error));
 
   SetUnevaluated(variable);
   SAVE(REGISTER_UNEVALUATED);
@@ -613,19 +486,17 @@ void EvaluateDefinition1() {
   Restore(REGISTER_CONTINUE);
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_UNEVALUATED);
-  DefineVariable(&error);
-  CHECK();
+  CHECK(DefineVariable(&error));
   // Return the symbol name as the result of the definition.
   SetValue(GetUnevaluated());
-  GOTO(GetContinue());
+  CONTINUE;
 }
 
 void EvaluateDefinition() {
   // (define name value)
 
   Object variable, value;
-  ExtractDefinitionArguments(GetExpression(), &variable, &value, &error);
-  CHECK();
+  CHECK(ExtractDefinitionArguments(GetExpression(), &variable, &value, &error));
 
   // (define name value)
   SetUnevaluated(variable);
@@ -641,8 +512,7 @@ void EvaluateUnknown() {
   LOG_ERROR("Unknown Expression");
   LOG_OP(LOG_EVALUATE, PrintlnObject(GetExpression()));
 
-  error = ERROR_EVALUATE_UNKNOWN_EXPRESSION;
-  GOTO(EvaluateError);
+  ERROR(ERROR_EVALUATE_UNKNOWN_EXPRESSION);
 }
 
 void EvaluateError() {
@@ -687,6 +557,118 @@ Object MakeProcedure(enum ErrorCode *error) {
   SetProcedureParameters(procedure, GetUnevaluated());
   SetProcedureBody(procedure, GetExpression());
   return procedure;
+}
+
+// if test fails, set the *error to the error_code and return
+#define ENSURE(test, error_code, error) BEGIN  if (!(test)) { *error = error_code; return; }  END
+
+void ExtractLambdaArguments(Object expression, Object *parameters, Object *body, enum ErrorCode *error) {
+  expression = Rest(expression);
+  // (lambda ...)
+
+  ENSURE(IsPair(expression), ERROR_EVALUATE_LAMBDA_MALFORMED, error);
+  // (lambda parameters ...)
+  *parameters = First(expression);
+  ENSURE(IsList(*parameters), ERROR_EVALUATE_LAMBDA_PARAMETERS_SHOULD_BE_LIST, error);
+
+  // (lambda parameters body)
+  *body = Rest(expression);
+  ENSURE(!IsNil(*body), ERROR_EVALUATE_LAMBDA_BODY_SHOULD_BE_NON_EMPTY, error);
+  ENSURE(IsPair(*body), ERROR_EVALUATE_LAMBDA_BODY_MALFORMED, error);
+}
+
+void ExtractIfPredicate(Object expression, Object *predicate, enum ErrorCode *error) {
+  expression = Rest(expression);
+  ENSURE(IsPair(expression), ERROR_EVALUATE_IF_MALFORMED, error);
+
+  *predicate = First(expression);
+}
+
+void ExtractIfAlternatives(Object expression, Object *consequent, Object *alternative, enum ErrorCode *error) {
+  expression = Rest(Rest(expression));
+  ENSURE(IsPair(expression), ERROR_EVALUATE_IF_MALFORMED, error);
+
+  // (if predicate consequent ...)
+  *consequent = First(expression);
+  expression = Rest(expression);
+  ENSURE(IsPair(expression), ERROR_EVALUATE_IF_MALFORMED, error);
+
+  // (if predicate consequent alternative ...)
+  *alternative = First(expression);
+  ENSURE(IsNil(expression), ERROR_EVALUATE_IF_TOO_MANY_ARGUMENTS, error);
+}
+
+void ExtractAssignmentOrDefinitionArguments(Object expression, Object *variable, Object *value, 
+    enum ErrorCode malformed,
+    enum ErrorCode variable_is_non_symbol,
+    enum ErrorCode too_many_arguments,
+    enum ErrorCode *error) {
+  expression = Rest(expression);
+  ENSURE(IsPair(expression), malformed, error);
+
+  // (set! variable ...)
+  *variable = First(expression);
+  ENSURE(IsSymbol(*variable), variable_is_non_symbol, error);
+
+  expression = Rest(expression);
+  ENSURE(IsPair(expression), malformed, error); 
+
+  // (set! variable value ...)
+  *value = First(expression);
+  expression = Rest(expression);
+  ENSURE(IsNil(expression), too_many_arguments, error);
+}
+
+void ExtractQuoted(Object expression, Object *quoted_expression, enum ErrorCode *error) {
+  expression = Rest(expression);
+  ENSURE(IsPair(expression), ERROR_EVALUATE_QUOTE_MALFORMED, error);
+
+  ENSURE(IsNil(Rest(expression)), ERROR_EVALUATE_QUOTE_TOO_MANY_ARGUMENTS, error);
+  *quoted_expression = First(expression);
+}
+void ExtractBegin(Object expression, Object *sequence, enum ErrorCode *error) {
+  expression = Rest(expression);
+  ENSURE(!IsNil(expression), ERROR_EVALUATE_BEGIN_EMPTY, error);
+  ENSURE(IsPair(expression), ERROR_EVALUATE_BEGIN_MALFORMED, error);
+  *sequence = expression;
+}
+#undef ENSURE
+
+void ExtractAssignmentArguments(Object expression, Object *variable, Object *value, enum ErrorCode *error) {
+  ExtractAssignmentOrDefinitionArguments(expression, variable, value,
+      ERROR_EVALUATE_SET_MALFORMED,
+      ERROR_EVALUATE_SET_NON_SYMBOL,
+      ERROR_EVALUATE_SET_TOO_MANY_ARGUMENTS,
+      error);
+}
+
+void ExtractDefinitionArguments(Object expression, Object *variable, Object *value, enum ErrorCode *error) {
+  ExtractAssignmentOrDefinitionArguments(expression, variable, value,
+      ERROR_EVALUATE_DEFINE_MALFORMED,
+      ERROR_EVALUATE_DEFINE_NON_SYMBOL,
+      ERROR_EVALUATE_DEFINE_TOO_MANY_ARGUMENTS,
+      error);
+}
+
+Object SetLastCdr(Object list, Object last_pair) {
+  assert(IsList(list));
+  assert(IsPair(last_pair));
+  // List is empty. The resulting list is just last_pair.
+  if (IsNil(list)) return last_pair;
+
+  Object head = list;
+  for (; IsPair(Cdr(list)); list = Cdr(list))
+    ;
+  SetCdr(list, last_pair);
+  return head;
+}
+
+void AdjoinArgument(enum ErrorCode *error) {
+  Object last_pair = AllocatePair(error);
+  if (*error) return;
+
+  SetCar(last_pair, GetValue());
+  SetArgumentList(SetLastCdr(GetArgumentList(), last_pair));
 }
 
 void TestEvaluate() {
