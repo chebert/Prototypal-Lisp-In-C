@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "byte_vector.h"
+#include "log.h"
 #include "pair.h"
 #include "root.h"
 #include "string.h"
@@ -24,8 +25,15 @@ static u64 next_index;
 #define CHECK(op)  BEGIN  (op); if (error) { GOTO(ReadError); }  END
 #define SAVE(reg)  BEGIN  CHECK(Save((reg), &error));  END
 
-b64 IsWhitespace(u8 ch);
-b64 IsTerminating(u8 ch);
+static b64 IsWhitespace(u8 ch);
+static b64 IsTerminating(u8 ch);
+static b64 IsNumberSign(u8 ch);
+static b64 IsDigit(u8 ch);
+static b64 IsExponentMarker(u8 ch);
+
+static void ConsumeChar(const u8 **source, u64 *length);
+static void OptionalNumberSign(const u8 **source, u64 *length);
+static u64 CountDigits(const u8 **source, u64 *length);
 
 u8 *ReadSource();
 u8 ReadCharacter();
@@ -50,6 +58,20 @@ void ReadString();
 void ReadNumberOrSymbol();
 
 void ReadError();
+
+// True if source is pointing at: decimal-point digit* [exponent]
+// if at_least_one_decimal_digit is true, then source must be pointing at:
+//   decimal-point digit+ [exponent] | decimal-point exponent
+static b64 IsDecimalAndOptionalExponent(const u8 **source, u64 *length, u8 *exponent_marker, b64 at_least_one_decimal_digit);
+// True if source is pointing at an exponent.
+// Exponent-marker is filled with the Real32 or Real64 exponent marker if true.
+static b64 IsExponent(const u8 **source, u64 *length, u8 *exponent_marker);
+
+// True if source is pointing at an integer.
+static b64 IsInteger(const u8 *source, u64 length);
+// True if source is pointing at a Real.
+// exponent_marker is filled with the exponent marker of the real (defaulting to 'e').
+static b64 IsReal(const u8 *source, u64 length, u8 *exponent_marker);
 
 Object ReadObject2(u64 *return_index, enum ErrorCode *return_error) {
   next_index = *return_index;
@@ -247,25 +269,27 @@ void ReadNumberOrSymbol() {
   UnreadCharacter();
 
   u64 length = next_index - start_index;
+
+  u8 exponent_marker;
   const u8 *data;
   CHECK(data = CopySourceString(ReadSource(), length, &error));
 
-  if (IsInteger(source, length)) {
+  if (IsInteger(data, length)) {
     s64 value;
     if (!sscanf(data, "%lld", &value))
       ERROR(ERROR_READ_COULD_NOT_READ_INTEGER);
 
     SetExpression(BoxFixnum(value));
-  } else if (IsReal(source, length)) {
+  } else if (IsReal(data, length, &exponent_marker)) {
     real64 value;
     if (!sscanf(data, "%lf", &value))
       ERROR(ERROR_READ_COULD_NOT_READ_REAL);
 
     SetExpression(BoxReal64(value));
   } else if (!strcmp(data, ".")) {
-    ERROR(ERROR_READ_UNEXPECTED_PAIR_SEPARATOR);
+    ERROR(ERROR_READ_INVALID_PAIR_SEPARATOR);
   } else {
-    SetExpression(InternSymbol(data));
+    CHECK(SetExpression(InternSymbol(data, &error)));
   }
   CONTINUE;
 }
@@ -295,12 +319,11 @@ Object ReverseInPlace(Object list, Object last_cdr) {
     Object next = list;
     list = Rest(list);
 
-    // Set the cdr to point at the expression.
-    SetCdr(next, expression);
-    // next is the new head of the list
-    expression = next;
+    // Push it onto the front of the result
+    SetCdr(next, result);
+    result = next;
   }
-  return expression;
+  return result;
 }
 
 b64 IsWhitespace(u8 ch) {
@@ -314,4 +337,97 @@ b64 IsWhitespace(u8 ch) {
 
 b64 IsTerminating(u8 ch) {
   return IsWhitespace(ch) || ch == ')' || ch == '(' || ch == '\'' || ch == ';' || ch == '"';
+}
+
+b64 IsNumberSign(u8 ch) {
+  return ch == '+' || ch == '-';
+}
+
+b64 IsDigit(u8 ch) {
+  return '0' <= ch && ch <= '9';
+}
+
+b64 IsExponentMarker(u8 ch) {
+  return ch == 'e' || ch == 'E';
+}
+
+void ConsumeChar(const u8 **source, u64 *length) {
+  *source = *source + 1;
+  *length = *length - 1;
+}
+
+void OptionalNumberSign(const u8 **source, u64 *length) {
+  if (IsNumberSign(**source)) {
+    ConsumeChar(source, length);
+  }
+}
+
+u64 CountDigits(const u8 **source, u64 *length) {
+  u64 num_digits = 0;
+  for (; IsDigit(**source) && *length > 0; ConsumeChar(source, length)) {
+    ++num_digits;
+  }
+  return num_digits;
+}
+
+// Integer := [sign] {digit}+
+b64 IsInteger(const u8 *source, u64 length) {
+  OptionalNumberSign(&source, &length);
+  u64 num_digits = CountDigits(&source, &length);
+  return num_digits >= 1 && length == 0;
+}
+
+b64 IsExponent(const u8 **source, u64 *length, u8 *exponent_marker) {
+  // exponent := exponent-marker [sign] {digit+}
+  if (*length == 0) return 0;
+
+  if (!IsExponentMarker(**source)) return 0;
+  *exponent_marker = **source;
+  ConsumeChar(source, length);
+
+  // exponent := [sign] {digit+}
+  OptionalNumberSign(source, length);
+
+  // exponent := {digit+}
+  return CountDigits(source, length) > 0;
+}
+
+b64 IsDecimalAndOptionalExponent(const u8 **source, u64 *length, u8 *exponent_marker, b64 at_least_one_decimal_digit) {
+  if (*length == 0) return 0;
+  // real := decimal-point {digit}+ [exponent]
+  //       | decimal-point exponent
+
+  if (**source != '.') return 0;
+  ConsumeChar(source, length);
+
+  // real := {digit}+
+  //       | {digit}* exponent
+  u64 num_digits = CountDigits(source, length);
+  return (*length == 0 && (!at_least_one_decimal_digit || num_digits > 0)) || IsExponent(source, length, exponent_marker);
+}
+
+b64 IsReal(const u8 *source, u64 length, u8 *exponent_marker) {
+  *exponent_marker = 'e';
+  // real := [sign] {digit}*    decimal-point {digit}*   [exponent]
+  //       | [sign] {digit}+  [ decimal-point {digit}* ]  exponent
+  OptionalNumberSign(&source, &length);
+  u64 num_digits = CountDigits(&source, &length);
+  if (num_digits == 0) {
+    // real := decimal-point {digit}* [exponent]
+    return IsDecimalAndOptionalExponent(&source, &length, exponent_marker, 1);
+  } else {
+    // real :=   decimal-point {digit}*   [exponent]
+    //       | [ decimal-point {digit}* ]  exponent
+    if (length == 0) return 0;
+
+    if (*source == '.') {
+      // real := decimal-point {digit}* [exponent]
+      return IsDecimalAndOptionalExponent(&source, &length, exponent_marker, 0);
+    } else if (IsExponent(&source, &length, exponent_marker)) {
+      // real := exponent
+      return length == 0;
+    } else {
+      return 0;
+    }
+  }
 }
