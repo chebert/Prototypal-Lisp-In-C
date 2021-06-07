@@ -163,10 +163,7 @@ Object Evaluate(Object expression) {
   next = EvaluateDispatch;
 
   // Run the evaluation loop until quit.
-  while (next) {
-    next();
-    if (error) return nil;
-  }
+  while (next) next();
 
   // Return the evaluated expression.
   return GetValue();
