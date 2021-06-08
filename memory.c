@@ -224,7 +224,7 @@ static Object MakePair(Object car, Object cdr, enum ErrorCode *error) {
 
 void TestMemory() {
   enum ErrorCode error = NO_ERROR;
-  InitializeMemory(32, &error);
+  InitializeMemory(128, &error);
   MakePair(BoxFixnum(4), BoxFixnum(2), &error);
   Object string = AllocateString("Hello", &error);
 

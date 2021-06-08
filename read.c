@@ -1,4 +1,4 @@
-#include "read2.h"
+#include "read.h"
 
 #include <assert.h>
 #include <string.h>
@@ -591,7 +591,7 @@ close_file:
   }
 }
 
-void TestRead2() {
+void TestRead() {
   enum ErrorCode error = NO_ERROR;
   InitializeMemory(512, &error);
   InitializeSymbolTable(1, &error);

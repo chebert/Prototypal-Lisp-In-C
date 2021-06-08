@@ -1,5 +1,5 @@
-#ifndef READ2_H
-#define READ2_H
+#ifndef READ_H
+#define READ_H
 
 #include "c_types.h"
 #include "error.h"
@@ -17,6 +17,6 @@ void SetReadSourceFromString(const u8 *source, enum ErrorCode *error);
 // Copies the file contents of filename into REGISTER_READ_SOURCE.
 void SetReadSourceFromFile(const u8 *filename, enum ErrorCode *error);
 
-void TestRead2();
+void TestRead();
 
 #endif
