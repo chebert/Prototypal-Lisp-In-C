@@ -123,37 +123,13 @@ static b64 TestNext(const struct ParseState *parse_state, b64 (*predicate)(u8 ch
   return index < parse_state->end_index && predicate(parse_state->source[index]);
 }
 
-b64 ConsumeOne(struct ParseState *parse_state, b64 (*predicate)(u8 ch)) {
-  if (TestNext(parse_state, predicate)) {
-    ++parse_state->index;
-    return 1;
-  }
-  return 0;
-}
-b64 ConsumeOneOptional(struct ParseState *parse_state, b64 (*predicate)(u8 ch)) {
-  if (TestNext(parse_state, predicate))
-    ++parse_state->index;
-  return 1;
-}
-b64 ConsumeZeroOrMore(struct ParseState *parse_state, b64 (*predicate)(u8 ch)) {
-  for (; TestNext(parse_state, predicate); ++parse_state->index)
-    ;
-  return 1;
-}
-b64 ConsumeOneOrMore(struct ParseState *parse_state, b64 (*predicate)(u8 ch)) {
-  if (TestNext(parse_state, predicate)) {
-    ++parse_state->index;
-    return ConsumeZeroOrMore(parse_state, predicate);
-  }
-  return 0;
-}
-b64 IsFullyParsed(struct ParseState *parse_state) {
-  return parse_state->end_index == parse_state->index;
-}
+#define SUCCEED return 1
+#define FAIL return 0
 
 // Sequences:
 // Returns 0 if the test fails.
-#define DO(test) BEGIN if (!(test)) return 0; END
+#define DO(test) BEGIN if (!(test)) FAIL; END
+#define THEN(test) DO(test)
 // Returns the value of test.
 #define FINALLY(test) return (test);
 
@@ -166,8 +142,34 @@ b64 IsFullyParsed(struct ParseState *parse_state) {
     if (op) return 1; \
     *parse_state = saved; \
   END
-// Returns 0
-#define FAIL return 0
+
+b64 ConsumeOne(struct ParseState *parse_state, b64 (*predicate)(u8 ch)) {
+  if (TestNext(parse_state, predicate)) {
+    ++parse_state->index;
+    SUCCEED;
+  }
+  FAIL;
+}
+b64 ConsumeOneOptional(struct ParseState *parse_state, b64 (*predicate)(u8 ch)) {
+  if (TestNext(parse_state, predicate))
+    ++parse_state->index;
+  SUCCEED;
+}
+b64 ConsumeZeroOrMore(struct ParseState *parse_state, b64 (*predicate)(u8 ch)) {
+  for (; TestNext(parse_state, predicate); ++parse_state->index)
+    ;
+  SUCCEED;
+}
+b64 ConsumeOneOrMore(struct ParseState *parse_state, b64 (*predicate)(u8 ch)) {
+  if (TestNext(parse_state, predicate)) {
+    ++parse_state->index;
+    return ConsumeZeroOrMore(parse_state, predicate);
+  }
+  FAIL;
+}
+b64 IsFullyParsed(struct ParseState *parse_state) {
+  return parse_state->end_index == parse_state->index;
+}
 
 b64 ConsumeOptional(struct ParseState *parse_state, b64 (*consume)(struct ParseState *)) {
   TRY(parse_state, consume(parse_state));
@@ -179,7 +181,8 @@ b64 ConsumeOneOrMoreSignedDigits(struct ParseState *parse_state) {
   // {sign?}{digit}+
   DO(ConsumeOneOptional(parse_state, IsNumberSign));
   // {digit}+
-  FINALLY(ConsumeOneOrMore(parse_state, IsDigit));
+  THEN(ConsumeOneOrMore(parse_state, IsDigit));
+  SUCCEED;
 }
 
 // signed-digits* := {sign?}{digit}*
@@ -187,13 +190,15 @@ b64 ConsumeZeroOrMoreSignedDigits(struct ParseState *parse_state) {
   // {sign?}{digit}*
   DO(ConsumeOneOptional(parse_state, IsNumberSign));
   // {digit}*
-  FINALLY(ConsumeZeroOrMore(parse_state, IsDigit));
+  THEN(ConsumeZeroOrMore(parse_state, IsDigit));
+  SUCCEED;
 }
 
 // Exponent := {exponent-marker}{signed-digits+}
 b64 ConsumeExponent(struct ParseState *parse_state) {
   DO(ConsumeOne(parse_state, IsExponentMarker));
-  FINALLY(ConsumeOneOrMoreSignedDigits(parse_state));
+  THEN(ConsumeOneOrMoreSignedDigits(parse_state));
+  SUCCEED;
 }
 
 // Leading-decimal := {sign?}{dot}{digit}+
@@ -201,9 +206,10 @@ b64 ConsumeLeadingDecimal(struct ParseState *parse_state) {
   // {sign?}{dot}{digit}+
   DO(ConsumeOneOptional(parse_state, IsNumberSign));
   // {dot}{digit}+
-  DO(ConsumeOne(parse_state, IsDot));
+  THEN(ConsumeOne(parse_state, IsDot));
   // {digit}+
-  FINALLY(ConsumeOneOrMore(parse_state, IsDigit));
+  THEN(ConsumeOneOrMore(parse_state, IsDigit));
+  SUCCEED;
 }
 
 // Non-leading-decimal := {signed-digits+}{dot}{digit}*
@@ -211,9 +217,10 @@ b64 ConsumeNonLeadingDecimal(struct ParseState *parse_state) {
   // {signed-digits+}{dot}{digit}*
   DO(ConsumeOneOrMoreSignedDigits(parse_state));
   // {dot}{digit}*
-  DO(ConsumeOne(parse_state, IsDot));
+  THEN(ConsumeOne(parse_state, IsDot));
   // {digit}*
-  FINALLY(ConsumeZeroOrMore(parse_state, IsDigit));
+  THEN(ConsumeZeroOrMore(parse_state, IsDigit));
+  SUCCEED;
 }
 
 // Decimal := ({non-leading-decimal}|{leading-decimal})
@@ -225,19 +232,16 @@ b64 ConsumeDecimal(struct ParseState *parse_state) {
   FAIL;
 }
 
-b64 IsInteger(struct ParseState parse_state) {
-  DO(ConsumeOneOrMoreSignedDigits(&parse_state));
-  FINALLY(IsFullyParsed(&parse_state));
-}
-
 b64 ConsumeDecimalAndOptionalExponent(struct ParseState *parse_state) {
   DO(ConsumeDecimal(parse_state));
-  FINALLY(ConsumeOptional(parse_state, ConsumeExponent));
+  THEN(ConsumeOptional(parse_state, ConsumeExponent));
+  SUCCEED;
 }
 
 b64 ConsumeZeroOrMoreSignedDigitsAndExponent(struct ParseState *parse_state) {
   DO(ConsumeZeroOrMoreSignedDigits(parse_state));
-  FINALLY(ConsumeExponent(parse_state));
+  THEN(ConsumeExponent(parse_state));
+  SUCCEED;
 }
 
 b64 ConsumeReal(struct ParseState *parse_state) {
@@ -246,21 +250,30 @@ b64 ConsumeReal(struct ParseState *parse_state) {
   FAIL;
 }
 
-// Real := (({decimal}[exponent]$)|({signed-digits*}{exponent}$))
+b64 IsInteger(struct ParseState parse_state) {
+  DO(ConsumeOneOrMoreSignedDigits(&parse_state));
+  return IsFullyParsed(&parse_state);
+}
+
+// Real := (({decimal}[exponent])|({signed-digits*}{exponent}))
 b64 IsReal(struct ParseState parse_state) {
   DO(ConsumeReal(&parse_state));
-  FINALLY(IsFullyParsed(&parse_state));
+  return IsFullyParsed(&parse_state);
 }
 #undef DO
 #undef TRY
 #undef FAIL
+#undef SUCCEED
 #undef FINALLY
 
 void ReadFromSource(enum ErrorCode *return_error) {
   next_index = UnboxFixnum(GetRegister(REGISTER_READ_SOURCE_POSITION));
 
+  SAVE(REGISTER_CONTINUE);
+  SetContinue(0);
   next = ReadDispatch;
   while (next) next();
+  Restore(REGISTER_CONTINUE);
 
   *return_error = error;
   SetRegister(REGISTER_READ_SOURCE_POSITION, next_index);

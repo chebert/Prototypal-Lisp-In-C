@@ -170,6 +170,7 @@ Object Evaluate(Object expression) {
 }
 
 Object EvaluateInAFreshEnvironment(Object expression) {
+  error = NO_ERROR;
   // Set the expression to be evaluated.
   SetExpression(expression);
 
@@ -514,6 +515,7 @@ void EvaluateUnknown() {
 
 void EvaluateError() {
   LOG_ERROR("%s", ErrorCodeString(error));
+  error = NO_ERROR;
   GOTO(0);
 }
 
@@ -669,6 +671,7 @@ void AdjoinArgument(enum ErrorCode *error) {
 }
 
 static void ReadObject(const u8 *source, enum ErrorCode *error) {
+  *error = NO_ERROR;
   SetReadSourceFromString(source, error);
   SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
   if (*error) return;
@@ -685,7 +688,6 @@ void TestEvaluate() {
 #define BERT(bertscript...) #bertscript
 
   ReadObject("'(hello world)", &error);
-  /*
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
   LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
@@ -789,7 +791,5 @@ void TestEvaluate() {
 
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
   LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
-
-  */
   DestroyMemory();
 }
