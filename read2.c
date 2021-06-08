@@ -19,16 +19,6 @@ static EvaluateFunction next;
 static enum ErrorCode error;
 static u64 next_index;
 
-static b64 IsWhitespace(u8 ch);
-static b64 IsTerminating(u8 ch);
-static b64 IsNumberSign(u8 ch);
-static b64 IsDigit(u8 ch);
-static b64 IsExponentMarker(u8 ch);
-
-static void ConsumeChar(const u8 **source, u64 *length);
-static void OptionalNumberSign(const u8 **source, u64 *length);
-static u64 CountDigits(const u8 **source, u64 *length);
-
 u8 *ReadSource();
 u8 ReadCharacter();
 void UnreadCharacter();
@@ -61,28 +51,219 @@ void ReadError();
 #define CHECK(op)  BEGIN  (op); if (error) { GOTO(ReadError); }  END
 #define SAVE(reg)  BEGIN  CHECK(Save((reg), &error));  END
 
-// True if source is pointing at: decimal-point digit* [exponent]
-// if at_least_one_decimal_digit is true, then source must be pointing at:
-//   decimal-point digit+ [exponent] | decimal-point exponent
-static b64 IsDecimalAndOptionalExponent(const u8 **source, u64 *length, u8 *exponent_marker, b64 at_least_one_decimal_digit);
-// True if source is pointing at an exponent.
-// Exponent-marker is filled with the Real32 or Real64 exponent marker if true.
-static b64 IsExponent(const u8 **source, u64 *length, u8 *exponent_marker);
+// Dot := (.)
+//   "."
+// Sign? := (+|-)?
+//   "+", "-", ""
+// Digit := (0|1|2|3|4|5|6|7|8|9)
+//   "3" "2"
+// exponent-marker := (e|E)
+//   "e" "E"
+// signed-digits+ := {sign?}{digit}+
+//   "+1" "-28" "1234"
+// signed-digits* := {sign?}{digit}*
+//   "-" "+" "-123" ""
+// Exponent := {exponent-marker}{signed-digits+}
+//   "e+234" "E-1" "e87"
+// Leading-decimal := {sign?}{dot}{digit}+
+//   "+.123" "-.4" ".875"
+// Non-leading-decimal := {signed-digits+}{dot}{digit}*
+//   "-3." "+42.8" "7.6"
+// Decimal := ({non-leading-decimal}|{leading-decimal})
+//    "+.123" "-3."
+// terminating-character := ({whitespace}|')'|'('|'|;|'"'|EOF)
 
-// True if source is pointing at an integer.
-static b64 IsInteger(const u8 *source, u64 length);
-// True if source is pointing at a Real.
-// exponent_marker is filled with the exponent marker of the real (defaulting to 'e').
-static b64 IsReal(const u8 *source, u64 length, u8 *exponent_marker);
+static b64 IsDot(u8 ch);
+static b64 IsNumberSign(u8 ch);
+static b64 IsDigit(u8 ch);
+static b64 IsExponentMarker(u8 ch);
+static b64 IsWhitespace(u8 ch);
+static b64 IsTerminating(u8 ch);
 
-void ReadObject2(u64 *return_index, enum ErrorCode *return_error) {
-  next_index = *return_index;
+struct ParseState {
+  const u8 *source;
+  u64 end_index;
+  u64 index;
+};
+static b64 TestNext(const struct ParseState *parse_state, b64 (*predicate)(u8 ch));
+static b64 ConsumeOneOptional(struct ParseState *parse_state, b64 (*predicate)(u8 ch));
+static b64 ConsumeZeroOrMore(struct ParseState *parse_state, b64 (*predicate)(u8 ch));
+static b64 ConsumeOne(struct ParseState *parse_state, b64 (*predicate)(u8 ch));
+static b64 ConsumeOneOrMore(struct ParseState *parse_state, b64 (*predicate)(u8 ch));
+static b64 IsFullyParsed(struct ParseState *parse_state);
+
+static b64 ConsumeOptional(struct ParseState *parse_state, b64 (*consume)(struct ParseState *parse_state));
+
+static b64 ConsumeZeroOrMoreSignedDigits(struct ParseState *parse_state);
+static b64 ConsumeOneOrMoreSignedDigits(struct ParseState *parse_state);
+static b64 ConsumeExponent(struct ParseState *parse_state);
+static b64 ConsumeLeadingDecimal(struct ParseState *parse_state);
+static b64 ConsumeNonLeadingDecimal(struct ParseState *parse_state);
+static b64 ConsumeDecimal(struct ParseState *parse_state);
+
+static b64 ConsumeDecimalAndOptionalExponent(struct ParseState *parse_state);
+static b64 ConsumeZeroOrMoreSignedDigitsAndExponent(struct ParseState *parse_state);
+static b64 ConsumeReal(struct ParseState *parse_state);
+
+// Rename: IsInteger/IsReal
+static b64 IsInteger(struct ParseState parse_state);
+static b64 IsReal(struct ParseState parse_state);
+
+// Pair separator := {dot}
+//   "."
+// Real := (({decimal}[exponent])|({signed-digits*}{exponent}))
+//   "+42.8" ".875e+234"
+//   -e-4 +123E+234 678e48
+// Integer := {signed-digits+}
+//   "-1" "+234" "8" 
+// Symbol := (.*)
+
+static b64 TestNext(const struct ParseState *parse_state, b64 (*predicate)(u8 ch)) {
+  u64 index = parse_state->index;
+  return index < parse_state->end_index && predicate(parse_state->source[index]);
+}
+
+b64 ConsumeOne(struct ParseState *parse_state, b64 (*predicate)(u8 ch)) {
+  if (TestNext(parse_state, predicate)) {
+    ++parse_state->index;
+    return 1;
+  }
+  return 0;
+}
+b64 ConsumeOneOptional(struct ParseState *parse_state, b64 (*predicate)(u8 ch)) {
+  if (TestNext(parse_state, predicate))
+    ++parse_state->index;
+  return 1;
+}
+b64 ConsumeZeroOrMore(struct ParseState *parse_state, b64 (*predicate)(u8 ch)) {
+  for (; TestNext(parse_state, predicate); ++parse_state->index)
+    ;
+  return 1;
+}
+b64 ConsumeOneOrMore(struct ParseState *parse_state, b64 (*predicate)(u8 ch)) {
+  if (TestNext(parse_state, predicate)) {
+    ++parse_state->index;
+    return ConsumeZeroOrMore(parse_state, predicate);
+  }
+  return 0;
+}
+b64 IsFullyParsed(struct ParseState *parse_state) {
+  return parse_state->end_index == parse_state->index;
+}
+
+// Sequences:
+// Returns 0 if the test fails.
+#define DO(test) BEGIN if (!(test)) return 0; END
+// Returns the value of test.
+#define FINALLY(test) return (test);
+
+// Alternatives:
+// Saves the parse state, and tries op. If it succeeds, returns true.
+// Otherwise restores the saved parse state.
+#define TRY(parse_state, op) \
+  BEGIN \
+    struct ParseState saved = *parse_state; \
+    if (op) return 1; \
+    *parse_state = saved; \
+  END
+// Returns 0
+#define FAIL return 0
+
+b64 ConsumeOptional(struct ParseState *parse_state, b64 (*consume)(struct ParseState *)) {
+  TRY(parse_state, consume(parse_state));
+  FAIL;
+}
+
+// signed-digits+ := {sign?}{digit}+
+b64 ConsumeOneOrMoreSignedDigits(struct ParseState *parse_state) {
+  // {sign?}{digit}+
+  DO(ConsumeOneOptional(parse_state, IsNumberSign));
+  // {digit}+
+  FINALLY(ConsumeOneOrMore(parse_state, IsDigit));
+}
+
+// signed-digits* := {sign?}{digit}*
+b64 ConsumeZeroOrMoreSignedDigits(struct ParseState *parse_state) {
+  // {sign?}{digit}*
+  DO(ConsumeOneOptional(parse_state, IsNumberSign));
+  // {digit}*
+  FINALLY(ConsumeZeroOrMore(parse_state, IsDigit));
+}
+
+// Exponent := {exponent-marker}{signed-digits+}
+b64 ConsumeExponent(struct ParseState *parse_state) {
+  DO(ConsumeOne(parse_state, IsExponentMarker));
+  FINALLY(ConsumeOneOrMoreSignedDigits(parse_state));
+}
+
+// Leading-decimal := {sign?}{dot}{digit}+
+b64 ConsumeLeadingDecimal(struct ParseState *parse_state) {
+  // {sign?}{dot}{digit}+
+  DO(ConsumeOneOptional(parse_state, IsNumberSign));
+  // {dot}{digit}+
+  DO(ConsumeOne(parse_state, IsDot));
+  // {digit}+
+  FINALLY(ConsumeOneOrMore(parse_state, IsDigit));
+}
+
+// Non-leading-decimal := {signed-digits+}{dot}{digit}*
+b64 ConsumeNonLeadingDecimal(struct ParseState *parse_state) {
+  // {signed-digits+}{dot}{digit}*
+  DO(ConsumeOneOrMoreSignedDigits(parse_state));
+  // {dot}{digit}*
+  DO(ConsumeOne(parse_state, IsDot));
+  // {digit}*
+  FINALLY(ConsumeZeroOrMore(parse_state, IsDigit));
+}
+
+// Decimal := ({non-leading-decimal}|{leading-decimal})
+b64 ConsumeDecimal(struct ParseState *parse_state) {
+  // {leading-decimal} OR {non-leading-decimal}
+  TRY(parse_state, ConsumeLeadingDecimal(parse_state));
+  // {non-leading-decimal}
+  TRY(parse_state, ConsumeNonLeadingDecimal(parse_state));
+  FAIL;
+}
+
+b64 IsInteger(struct ParseState parse_state) {
+  DO(ConsumeOneOrMoreSignedDigits(&parse_state));
+  FINALLY(IsFullyParsed(&parse_state));
+}
+
+b64 ConsumeDecimalAndOptionalExponent(struct ParseState *parse_state) {
+  DO(ConsumeDecimal(parse_state));
+  FINALLY(ConsumeOptional(parse_state, ConsumeExponent));
+}
+
+b64 ConsumeZeroOrMoreSignedDigitsAndExponent(struct ParseState *parse_state) {
+  DO(ConsumeZeroOrMoreSignedDigits(parse_state));
+  FINALLY(ConsumeExponent(parse_state));
+}
+
+b64 ConsumeReal(struct ParseState *parse_state) {
+  TRY(parse_state, ConsumeDecimalAndOptionalExponent(parse_state));
+  TRY(parse_state, ConsumeZeroOrMoreSignedDigitsAndExponent(parse_state));
+  FAIL;
+}
+
+// Real := (({decimal}[exponent]$)|({signed-digits*}{exponent}$))
+b64 IsReal(struct ParseState parse_state) {
+  DO(ConsumeReal(&parse_state));
+  FINALLY(IsFullyParsed(&parse_state));
+}
+#undef DO
+#undef TRY
+#undef FAIL
+#undef FINALLY
+
+void ReadFromSource(enum ErrorCode *return_error) {
+  next_index = UnboxFixnum(GetRegister(REGISTER_READ_SOURCE_POSITION));
+
   next = ReadDispatch;
-
   while (next) next();
 
   *return_error = error;
-  *return_index = next_index;
+  SetRegister(REGISTER_READ_SOURCE_POSITION, next_index);
 }
 
 // Leaves the start_index at the first non-comment character
@@ -95,10 +276,13 @@ void DiscardComment() {
 
 // Leaves the next character at the first non-comment & non-whitespace character
 void DiscardWhitespaceAndComments() {
-  for (u8 ch = ReadCharacter(); IsWhitespace(ch) || ch == ';'; ch = ReadCharacter()) {
+  for (u8 ch = ReadCharacter(); 1; ch = ReadCharacter()) {
     if (ch == ';')
       DiscardComment();
+    else if (!IsWhitespace(ch))
+      break;
   }
+  // Just read a non-comment non-whitespace character. Unread it.
   UnreadCharacter();
 }
 
@@ -158,9 +342,6 @@ void ReadListContinue() {
       // Pair separator
       SetContinue(ReadEndOfDottedList);
       GOTO(ReadDispatch);
-    } else if (next_ch == '\0') {
-      // EOF
-      ERROR(ERROR_READ_UNTERMINATED_PAIR);
     } else {
       // Part of a number/symbol
       UnreadCharacter();
@@ -265,12 +446,6 @@ const u8 *CopySourceString(const u8 *source, u64 length, enum ErrorCode *error) 
   return source_buffer;
 }
 
-// Integer := [sign] {digit} {digit}*
-// real := [sign]           decimal-point {digit}+ [exponent]
-//       | [sign] {digit}+  decimal-point {digit}* [exponent]
-//       | [sign] {digit}+ [decimal-point {digit}*] exponent
-// exponent := (e | E) [sign] {digit+}
-// otherwise symbol
 void ReadNumberOrSymbol() {
   u64 start_index = next_index;
   for (u8 ch = ReadCharacter(); !IsTerminating(ch); ch = ReadCharacter())
@@ -283,7 +458,12 @@ void ReadNumberOrSymbol() {
   const u8 *data;
   CHECK(data = CopySourceString(&ReadSource()[start_index], length, &error));
 
-  if (IsInteger(data, length)) {
+  struct ParseState parse_state;
+  parse_state.source = data;
+  parse_state.end_index = length;
+  parse_state.index = 0;
+
+  if (IsInteger(parse_state)) {
     s64 value;
     if (!sscanf(data, "%lld", &value))
       ERROR(ERROR_READ_COULD_NOT_READ_INTEGER);
@@ -291,7 +471,7 @@ void ReadNumberOrSymbol() {
     SetExpression(BoxFixnum(value));
     LOG(LOG_READ, "Read fixnum");
     LOG_OP(LOG_READ, PrintlnObject(GetExpression()));
-  } else if (IsReal(data, length, &exponent_marker)) {
+  } else if (IsReal(parse_state)) {
     real64 value;
     if (!sscanf(data, "%lf", &value))
       ERROR(ERROR_READ_COULD_NOT_READ_REAL);
@@ -299,8 +479,6 @@ void ReadNumberOrSymbol() {
     SetExpression(BoxReal64(value));
     LOG(LOG_READ, "Read real64");
     LOG_OP(LOG_READ, PrintlnObject(GetExpression()));
-  } else if (!strcmp(data, ".")) {
-    ERROR(ERROR_READ_INVALID_PAIR_SEPARATOR);
   } else {
     CHECK(SetExpression(InternSymbol(data, &error)));
     LOG(LOG_READ, "Read symbol: %s from %s", data);
@@ -355,101 +533,49 @@ b64 IsTerminating(u8 ch) {
   return IsWhitespace(ch) || ch == ')' || ch == '(' || ch == '\'' || ch == ';' || ch == '"' || ch == '\0';
 }
 
-b64 IsNumberSign(u8 ch) {
-  return ch == '+' || ch == '-';
-}
-
-b64 IsDigit(u8 ch) {
-  return '0' <= ch && ch <= '9';
-}
-
-b64 IsExponentMarker(u8 ch) {
-  return ch == 'e' || ch == 'E';
-}
-
-void ConsumeChar(const u8 **source, u64 *length) {
-  *source = *source + 1;
-  *length = *length - 1;
-}
-
-void OptionalNumberSign(const u8 **source, u64 *length) {
-  if (IsNumberSign(**source)) {
-    ConsumeChar(source, length);
-  }
-}
-
-u64 CountDigits(const u8 **source, u64 *length) {
-  u64 num_digits = 0;
-  for (; IsDigit(**source) && *length > 0; ConsumeChar(source, length)) {
-    ++num_digits;
-  }
-  return num_digits;
-}
-
-// Integer := [sign] {digit}+
-b64 IsInteger(const u8 *source, u64 length) {
-  OptionalNumberSign(&source, &length);
-  u64 num_digits = CountDigits(&source, &length);
-  return num_digits >= 1 && length == 0;
-}
-
-b64 IsExponent(const u8 **source, u64 *length, u8 *exponent_marker) {
-  // exponent := exponent-marker [sign] {digit+}
-  if (*length == 0) return 0;
-
-  if (!IsExponentMarker(**source)) return 0;
-  *exponent_marker = **source;
-  ConsumeChar(source, length);
-
-  // exponent := [sign] {digit+}
-  OptionalNumberSign(source, length);
-
-  // exponent := {digit+}
-  return CountDigits(source, length) > 0;
-}
-
-b64 IsDecimalAndOptionalExponent(const u8 **source, u64 *length, u8 *exponent_marker, b64 at_least_one_decimal_digit) {
-  if (*length == 0) return 0;
-  // real := decimal-point {digit}+ [exponent]
-  //       | decimal-point exponent
-
-  if (**source != '.') return 0;
-  ConsumeChar(source, length);
-
-  // real := {digit}+
-  //       | {digit}* exponent
-  u64 num_digits = CountDigits(source, length);
-  return (*length == 0 && (!at_least_one_decimal_digit || num_digits > 0)) || IsExponent(source, length, exponent_marker);
-}
-
-b64 IsReal(const u8 *source, u64 length, u8 *exponent_marker) {
-  *exponent_marker = 'e';
-  // real := [sign] {digit}*    decimal-point {digit}*   [exponent]
-  //       | [sign] {digit}+  [ decimal-point {digit}* ]  exponent
-  OptionalNumberSign(&source, &length);
-  u64 num_digits = CountDigits(&source, &length);
-  if (num_digits == 0) {
-    // real := decimal-point {digit}* [exponent]
-    return IsDecimalAndOptionalExponent(&source, &length, exponent_marker, 1);
-  } else {
-    // real :=   decimal-point {digit}*   [exponent]
-    //       | [ decimal-point {digit}* ]  exponent
-    if (length == 0) return 0;
-
-    if (*source == '.') {
-      // real := decimal-point {digit}* [exponent]
-      return IsDecimalAndOptionalExponent(&source, &length, exponent_marker, 0);
-    } else if (IsExponent(&source, &length, exponent_marker)) {
-      // real := exponent
-      return length == 0;
-    } else {
-      return 0;
-    }
-  }
-}
+b64 IsDot(u8 ch) { return ch == '.'; }
+b64 IsNumberSign(u8 ch) { return ch == '+' || ch == '-'; }
+b64 IsDigit(u8 ch) { return '0' <= ch && ch <= '9'; }
+b64 IsExponentMarker(u8 ch) { return ch == 'e' || ch == 'E'; }
 
 static b64 SymbolEq(Object symbol, const u8 *name) {
   return IsSymbol(symbol) && !strcmp(StringCharacterBuffer(symbol), name);
+}
+
+void SetReadSourceFromString(const u8 *source, enum ErrorCode *error) {
+  SetRegister(REGISTER_READ_SOURCE, AllocateString(source, error));
+}
+
+void SetReadSourceFromFile(const u8 *filename, enum ErrorCode *error) {
+  FILE *file = fopen(filename, "rb");
+  if (!file) {
+    *error = ERROR_COULD_NOT_OPEN_BINARY_FILE_FOR_READING;
+    return;
+  }
+
+#define ENSURE(test, error_code) BEGIN  if (!(test)) { *error = error_code; goto close_file; }  END
+  ENSURE(!fseek(file, 0, SEEK_END), ERROR_COULD_NOT_SEEK_TO_END_OF_FILE);
+  s64 length = ftell(file);
+  ENSURE(length >= 0, ERROR_COULD_NOT_TELL_FILE_POSITION);
+  ENSURE(!fseek(file, 0, SEEK_SET), ERROR_COULD_NOT_SEEK_TO_START_OF_FILE);
+
+  SetRegister(REGISTER_READ_SOURCE, AllocateByteVector(length + 1, error));
+  if (*error) goto close_file;
+
+  s64 num_bytes_read = fread(ReadSource(), 1, length, file);
+  ENSURE(!ferror(file), ERROR_COULD_NOT_READ_FILE);
+
+  // Null-terminate
+  UnsafeByteVectorSet(GetRegister(REGISTER_READ_SOURCE), length, 0);
+  SetRegister(REGISTER_READ_SOURCE, BoxString(GetRegister(REGISTER_READ_SOURCE)));
+
+#undef ENSURE
+
+close_file:
+  if (fclose(file)) {
+    *error = ERROR_COULD_NOT_CLOSE_FILE;
+    return;
+  }
 }
 
 void TestRead2() {
@@ -461,9 +587,9 @@ void TestRead2() {
   // Read string
   {
     const u8* source = "\"abra\"";
-    SetRegister(REGISTER_READ_SOURCE, AllocateString(source, &error));
-    u64 index = 0;
-    ReadObject2(&index, &error);
+    SetReadSourceFromString(source, &error);
+    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
+    ReadFromSource(&error);
     assert(!error);
     assert(IsString(GetExpression()));
     assert(!strcmp("abra", StringCharacterBuffer(GetExpression())));
@@ -471,21 +597,21 @@ void TestRead2() {
 
   {
     const u8 *source = "-12345";
-    SetRegister(REGISTER_READ_SOURCE, AllocateString(source, &error));
-    u64 index = 0;
-    ReadObject2(&index, &error);
+    SetReadSourceFromString(source, &error);
+    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
+    ReadFromSource(&error);
     assert(!error);
     assert(IsFixnum(GetExpression()));
     assert(-12345 == UnboxFixnum(GetExpression()));
-    assert(index == 6);
+    assert(GetRegister(REGISTER_READ_SOURCE_POSITION) == 6);
   }
 
   // Read real64
   {
     const u8* source = "-123.4e5";
-    SetRegister(REGISTER_READ_SOURCE, AllocateString(source, &error));
-    u64 index = 0;
-    ReadObject2(&index, &error);
+    SetReadSourceFromString(source, &error);
+    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
+    ReadFromSource(&error);
     assert(!error);
     assert(IsReal64(GetRegister(REGISTER_EXPRESSION)));
     assert(-123.4e5 == UnboxReal64(GetRegister(REGISTER_EXPRESSION)));
@@ -494,9 +620,9 @@ void TestRead2() {
   // Read symbol
   {
     const u8* source = "the-symbol";
-    SetRegister(REGISTER_READ_SOURCE, AllocateString(source, &error));
-    u64 index = 0;
-    ReadObject2(&index, &error);
+    SetReadSourceFromString(source, &error);
+    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
+    ReadFromSource(&error);
     assert(!error);
     assert(SymbolEq(GetRegister(REGISTER_EXPRESSION), "the-symbol"));
     assert(!strcmp("the-symbol", StringCharacterBuffer(GetRegister(REGISTER_EXPRESSION))));
@@ -505,9 +631,9 @@ void TestRead2() {
   // Read ()
   {
     const u8* source = " (     \n)";
-    SetRegister(REGISTER_READ_SOURCE, AllocateString(source, &error));
-    u64 index = 0;
-    ReadObject2(&index, &error);
+    SetReadSourceFromString(source, &error);
+    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
+    ReadFromSource(&error);
     assert(!error);
     assert(IsNil(GetRegister(REGISTER_EXPRESSION)));
   }
@@ -515,9 +641,9 @@ void TestRead2() {
   // Read Pair
   {
     const u8* source = " (a . b)";
-    SetRegister(REGISTER_READ_SOURCE, AllocateString(source, &error));
-    u64 index = 0;
-    ReadObject2(&index, &error);
+    SetReadSourceFromString(source, &error);
+    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
+    ReadFromSource(&error);
     assert(!error);
     assert(IsPair(GetRegister(REGISTER_EXPRESSION)));
     assert(SymbolEq(Car(GetRegister(REGISTER_EXPRESSION)), "a"));
@@ -527,9 +653,9 @@ void TestRead2() {
   // Read List
   {
     const u8* source = " (a)";
-    SetRegister(REGISTER_READ_SOURCE, AllocateString(source, &error));
-    u64 index = 0;
-    ReadObject2(&index, &error);
+    SetReadSourceFromString(source, &error);
+    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
+    ReadFromSource(&error);
     assert(!error);
     assert(IsPair(GetRegister(REGISTER_EXPRESSION)));
     assert(SymbolEq(Car(GetRegister(REGISTER_EXPRESSION)), "a"));
@@ -540,9 +666,9 @@ void TestRead2() {
   {
     const u8* source = " ((a . b) (c . d) . (e . f))";
     //                    st      uv         w
-    SetRegister(REGISTER_READ_SOURCE, AllocateString(source, &error));
-    u64 index = 0;
-    ReadObject2(&index, &error);
+    SetReadSourceFromString(source, &error);
+    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
+    ReadFromSource(&error);
     assert(!error);
     Object s = GetRegister(REGISTER_EXPRESSION);
     Object t = Car(s);
@@ -562,9 +688,9 @@ void TestRead2() {
   {
     const u8* source = "(a b (c d . e) (f g) h)";
     //                   s t uv w      xy z  S
-    SetRegister(REGISTER_READ_SOURCE, AllocateString(source, &error));
-    u64 index = 0;
-    ReadObject2(&index, &error);
+    SetReadSourceFromString(source, &error);
+    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
+    ReadFromSource(&error);
     assert(!error);
     Object s = GetRegister(REGISTER_EXPRESSION);
     Object t = Cdr(s);
@@ -593,9 +719,9 @@ void TestRead2() {
     const u8* source = "'(a b)";
     // (quote . ((a . (b . nil)) . nil))
     //  s        tu    v
-    SetRegister(REGISTER_READ_SOURCE, AllocateString(source, &error));
-    u64 index = 0;
-    ReadObject2(&index, &error);
+    SetReadSourceFromString(source, &error);
+    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
+    ReadFromSource(&error);
     assert(!error);
     Object s = GetRegister(REGISTER_EXPRESSION);
     Object t = Cdr(s);
@@ -605,6 +731,19 @@ void TestRead2() {
     assert(SymbolEq(Car(s), "quote"));
     assert(SymbolEq(Car(u), "a"));
     assert(SymbolEq(Car(v), "b"));
+  }
+
+  // Read from file
+  {
+    SetReadSourceFromFile("base.bert", &error);
+    if (error) {
+      printf("Error: %s\n", ErrorCodeString(error));
+    }
+    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
+    ReadFromSource(&error);
+    PrintlnObject(GetExpression());
+    ReadFromSource(&error);
+    PrintlnObject(GetExpression());
   }
 
   DestroyMemory();

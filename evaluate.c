@@ -9,7 +9,7 @@
 #include "pair.h"
 #include "primitives.h"
 #include "root.h"
-#include "read.h"
+#include "read2.h"
 #include "string.h"
 #include "symbol_table.h"
 
@@ -668,6 +668,14 @@ void AdjoinArgument(enum ErrorCode *error) {
   SetArgumentList(SetLastCdr(GetArgumentList(), last_pair));
 }
 
+static void ReadObject(const u8 *source, enum ErrorCode *error) {
+  SetReadSourceFromString(source, error);
+  SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
+  if (*error) return;
+  ReadFromSource(error);
+}
+
+
 void TestEvaluate() {
   InitializeMemory(1024, &error);
   InitializeSymbolTable(1, &error);
@@ -677,6 +685,7 @@ void TestEvaluate() {
 #define BERT(bertscript...) #bertscript
 
   ReadObject("'(hello world)", &error);
+  /*
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
   LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
@@ -781,5 +790,6 @@ void TestEvaluate() {
   LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
   LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
 
+  */
   DestroyMemory();
 }

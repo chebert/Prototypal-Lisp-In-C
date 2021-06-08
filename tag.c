@@ -1,9 +1,9 @@
-#include <stdio.h>
-#include <assert.h>
-#include <stdlib.h>
-#include <math.h>
-
 #include "tag.h"
+
+#include <assert.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 // Real64 Encodings
 // Normal Encoding:
@@ -140,6 +140,7 @@ Object BoxFilePointer(FILE *file) {
 }
 
 s64 UnboxFixnum(Object object) {
+  assert(IsFixnum(object));
   u64 sign_bit_mask = SHIFT_LEFT(1, TAG_SHIFT-1); 
   b64 is_sign_bit_set = (sign_bit_mask & object) != 0; 
 
@@ -154,12 +155,15 @@ real64 UnboxReal64(Object object)     { return U64ToReal64(object); }
 u64    UnboxReference(Object object)  { return (PAYLOAD_MASK & object); }
 u64    UnboxBlobHeader(Object object) { return (PAYLOAD_MASK & object); }
 PrimitiveFunction UnboxPrimitiveProcedure(Object object) {
+  assert(IsPrimitiveProcedure(object));
   return (PrimitiveFunction)(PAYLOAD_MASK & object);
 }
 EvaluateFunction UnboxEvaluateFunction(Object object) {
+  assert(IsEvaluateFunction(object));
   return (EvaluateFunction)(PAYLOAD_MASK & object);
 }
 FILE *UnboxFilePointer(Object object) {
+  assert(IsFilePointer(object));
   return (FILE *)(PAYLOAD_MASK & object);
 }
 

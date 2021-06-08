@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "blob.h"
+#include "log.h"
 #include "memory.h"
 
 Object AllocateByteVector(u64 num_bytes, enum ErrorCode *error) {
