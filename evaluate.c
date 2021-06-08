@@ -221,10 +221,10 @@ b64 IsSelfEvaluating(Object expression) {
       || IsFalse(expression)
       || IsFixnum(expression)
       || IsReal64(expression)
-      || IsString(expression)
+      || IsString(expression);
       // NOTE: No syntax for these right now:
-      || IsVector(expression)
-      || IsByteVector(expression);
+      // IsVector(expression)
+      // IsByteVector(expression)
 }
 
 b64 IsTaggedList(Object list, const char *tag) {
@@ -558,6 +558,7 @@ Object MakeProcedure(enum ErrorCode *error) {
   return procedure;
 }
 
+// TODO: move into extract.c
 // if test fails, set the *error to the error_code and return
 #define ENSURE(test, error_code, error) BEGIN  if (!(test)) { *error = error_code; return; }  END
 

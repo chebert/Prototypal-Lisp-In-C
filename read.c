@@ -72,6 +72,14 @@ void ReadError();
 // Decimal := ({non-leading-decimal}|{leading-decimal})
 //    "+.123" "-3."
 // terminating-character := ({whitespace}|')'|'('|'|;|'"'|EOF)
+// Pair separator := {dot}
+//   "."
+// Real := (({decimal}[exponent])|({signed-digits*}{exponent}))
+//   "+42.8" ".875e+234"
+//   -e-4 +123E+234 678e48
+// Integer := {signed-digits+}
+//   "-1" "+234" "8" 
+// Symbol := (.*)
 
 static b64 IsDot(u8 ch);
 static b64 IsNumberSign(u8 ch);
@@ -108,15 +116,6 @@ static b64 ConsumeReal(struct ParseState *parse_state);
 // Rename: IsInteger/IsReal
 static b64 IsInteger(struct ParseState parse_state);
 static b64 IsReal(struct ParseState parse_state);
-
-// Pair separator := {dot}
-//   "."
-// Real := (({decimal}[exponent])|({signed-digits*}{exponent}))
-//   "+42.8" ".875e+234"
-//   -e-4 +123E+234 678e48
-// Integer := {signed-digits+}
-//   "-1" "+234" "8" 
-// Symbol := (.*)
 
 static b64 TestNext(const struct ParseState *parse_state, b64 (*predicate)(u8 ch)) {
   u64 index = parse_state->index;
@@ -581,7 +580,6 @@ void SetReadSourceFromFile(const u8 *filename, enum ErrorCode *error) {
   // Null-terminate
   UnsafeByteVectorSet(GetRegister(REGISTER_READ_SOURCE), length, 0);
   SetRegister(REGISTER_READ_SOURCE, BoxString(GetRegister(REGISTER_READ_SOURCE)));
-
 #undef ENSURE
 
 close_file:
