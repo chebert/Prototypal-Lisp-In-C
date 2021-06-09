@@ -265,8 +265,8 @@ b64 IsReal(struct ParseState parse_state) {
 #undef SUCCEED
 #undef FINALLY
 
-void ReadFromSource(enum ErrorCode *return_error) {
-  next_index = UnboxFixnum(GetRegister(REGISTER_READ_SOURCE_POSITION));
+void ReadFromSource(s64 *position, enum ErrorCode *return_error) {
+  next_index = *position;
 
   SAVE(REGISTER_CONTINUE);
   SetContinue(0);
@@ -275,7 +275,7 @@ void ReadFromSource(enum ErrorCode *return_error) {
   Restore(REGISTER_CONTINUE);
 
   *return_error = error;
-  SetRegister(REGISTER_READ_SOURCE_POSITION, next_index);
+  *position = next_index;
 }
 
 // Leaves the start_index at the first non-comment character
@@ -599,8 +599,8 @@ void TestRead() {
   {
     const u8* source = "\"abra\"";
     SetReadSourceFromString(source, &error);
-    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
-    ReadFromSource(&error);
+    s64 position = 0;
+    ReadFromSource(&position, &error);
     assert(!error);
     assert(IsString(GetExpression()));
     assert(!strcmp("abra", StringCharacterBuffer(GetExpression())));
@@ -609,20 +609,20 @@ void TestRead() {
   {
     const u8 *source = "-12345";
     SetReadSourceFromString(source, &error);
-    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
-    ReadFromSource(&error);
+    s64 position = 0;
+    ReadFromSource(&position, &error);
     assert(!error);
     assert(IsFixnum(GetExpression()));
     assert(-12345 == UnboxFixnum(GetExpression()));
-    assert(GetRegister(REGISTER_READ_SOURCE_POSITION) == 6);
+    assert(position == 6);
   }
 
   // Read real64
   {
     const u8* source = "-123.4e5";
     SetReadSourceFromString(source, &error);
-    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
-    ReadFromSource(&error);
+    s64 position = 0;
+    ReadFromSource(&position, &error);
     assert(!error);
     assert(IsReal64(GetRegister(REGISTER_EXPRESSION)));
     assert(-123.4e5 == UnboxReal64(GetRegister(REGISTER_EXPRESSION)));
@@ -632,8 +632,8 @@ void TestRead() {
   {
     const u8* source = "the-symbol";
     SetReadSourceFromString(source, &error);
-    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
-    ReadFromSource(&error);
+    s64 position = 0;
+    ReadFromSource(&position, &error);
     assert(!error);
     assert(SymbolEq(GetRegister(REGISTER_EXPRESSION), "the-symbol"));
     assert(!strcmp("the-symbol", StringCharacterBuffer(GetRegister(REGISTER_EXPRESSION))));
@@ -643,8 +643,8 @@ void TestRead() {
   {
     const u8* source = " (     \n)";
     SetReadSourceFromString(source, &error);
-    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
-    ReadFromSource(&error);
+    s64 position = 0;
+    ReadFromSource(&position, &error);
     assert(!error);
     assert(IsNil(GetRegister(REGISTER_EXPRESSION)));
   }
@@ -653,8 +653,8 @@ void TestRead() {
   {
     const u8* source = " (a . b)";
     SetReadSourceFromString(source, &error);
-    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
-    ReadFromSource(&error);
+    s64 position = 0;
+    ReadFromSource(&position, &error);
     assert(!error);
     assert(IsPair(GetRegister(REGISTER_EXPRESSION)));
     assert(SymbolEq(Car(GetRegister(REGISTER_EXPRESSION)), "a"));
@@ -665,8 +665,8 @@ void TestRead() {
   {
     const u8* source = " (a)";
     SetReadSourceFromString(source, &error);
-    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
-    ReadFromSource(&error);
+    s64 position = 0;
+    ReadFromSource(&position, &error);
     assert(!error);
     assert(IsPair(GetRegister(REGISTER_EXPRESSION)));
     assert(SymbolEq(Car(GetRegister(REGISTER_EXPRESSION)), "a"));
@@ -678,8 +678,8 @@ void TestRead() {
     const u8* source = " ((a . b) (c . d) . (e . f))";
     //                    st      uv         w
     SetReadSourceFromString(source, &error);
-    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
-    ReadFromSource(&error);
+    s64 position = 0;
+    ReadFromSource(&position, &error);
     assert(!error);
     Object s = GetRegister(REGISTER_EXPRESSION);
     Object t = Car(s);
@@ -700,8 +700,8 @@ void TestRead() {
     const u8* source = "(a b (c d . e) (f g) h)";
     //                   s t uv w      xy z  S
     SetReadSourceFromString(source, &error);
-    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
-    ReadFromSource(&error);
+    s64 position = 0;
+    ReadFromSource(&position, &error);
     assert(!error);
     Object s = GetRegister(REGISTER_EXPRESSION);
     Object t = Cdr(s);
@@ -731,8 +731,8 @@ void TestRead() {
     // (quote . ((a . (b . nil)) . nil))
     //  s        tu    v
     SetReadSourceFromString(source, &error);
-    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
-    ReadFromSource(&error);
+    s64 position = 0;
+    ReadFromSource(&position, &error);
     assert(!error);
     Object s = GetRegister(REGISTER_EXPRESSION);
     Object t = Cdr(s);
@@ -750,10 +750,10 @@ void TestRead() {
     if (error) {
       printf("Error: %s\n", ErrorCodeString(error));
     }
-    SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
-    ReadFromSource(&error);
+    s64 position = 0;
+    ReadFromSource(&position, &error);
     PrintlnObject(GetExpression());
-    ReadFromSource(&error);
+    ReadFromSource(&position, &error);
     PrintlnObject(GetExpression());
   }
 

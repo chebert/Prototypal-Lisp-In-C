@@ -5,11 +5,11 @@
 #include "error.h"
 
 // Read an object from the string in REGISTER_READ_SOURCE, starting
-// from REGISTER_READ_SOURCE_POSITION.
+// from position.
 // The read-in object is left in REGISTER_EXPRESSION.
-// The REGISTER_READ_SOURCE_POSITION is left pointing to the first unconsumed character.
+// The position is left pointing to the first unconsumed character.
 // If an error occurs, the error code is set.
-void ReadFromSource(enum ErrorCode *error);
+void ReadFromSource(s64 *position, enum ErrorCode *error);
 
 // Copies source string into the REGISTER_READ_SOURCE.
 void SetReadSourceFromString(const u8 *source, enum ErrorCode *error);

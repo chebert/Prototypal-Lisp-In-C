@@ -5,6 +5,7 @@
 #include "evaluate.h"
 #include "log.h"
 #include "pair.h"
+#include "read.h"
 #include "root.h"
 #include "byte_vector.h"
 #include "string.h"

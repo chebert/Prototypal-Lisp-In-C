@@ -674,9 +674,9 @@ void AdjoinArgument(enum ErrorCode *error) {
 static void ReadObject(const u8 *source, enum ErrorCode *error) {
   *error = NO_ERROR;
   SetReadSourceFromString(source, error);
-  SetRegister(REGISTER_READ_SOURCE_POSITION, 0);
   if (*error) return;
-  ReadFromSource(error);
+  s64 position = 0;
+  ReadFromSource(&position, error);
 }
 
 

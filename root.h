@@ -14,7 +14,6 @@ enum Register {
   REGISTER_SYMBOL_TABLE,
   // Registers for reading
   REGISTER_READ_SOURCE,
-  REGISTER_READ_SOURCE_POSITION,
   REGISTER_READ_STACK,
 
   // Registers for evaluation
