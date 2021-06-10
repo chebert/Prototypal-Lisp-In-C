@@ -3,13 +3,14 @@
 
 #include "c_types.h"
 #include "error.h"
+#include "tag.h"
 
-// Read an object from the string in REGISTER_READ_SOURCE, starting
-// from position.
-// The read-in object is left in REGISTER_EXPRESSION.
+// Read an object from the string, starting from position.
+// The read-in object is returned.
 // The position is left pointing to the first unconsumed character.
+// Modifies: REGISTER_READ_RESULT, REGISTER_READ_STACK, and REGISTER_READ_SOURCE
 // If an error occurs, the error code is set.
-void ReadFromSource(s64 *position, enum ErrorCode *error);
+Object ReadFromString(Object string, s64 *position, enum ErrorCode *return_error);
 
 // Copies source string into the REGISTER_READ_SOURCE.
 void SetReadSourceFromString(const u8 *source, enum ErrorCode *error);

@@ -15,6 +15,7 @@ enum Register {
   // Registers for reading
   REGISTER_READ_SOURCE,
   REGISTER_READ_STACK,
+  REGISTER_READ_RESULT,
 
   // Registers for evaluation
   REGISTER_STACK,

@@ -490,3 +490,6 @@ DECLARE_PRIMITIVE(PrimitiveVectorRef, arguments, error) {
 
   return UnsafeVectorRef(vector, UnboxFixnum(index));
 }
+
+DECLARE_PRIMITIVE(PrimitiveReadFromString, arguments, error) {
+}

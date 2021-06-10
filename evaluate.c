@@ -671,12 +671,12 @@ void AdjoinArgument(enum ErrorCode *error) {
   SetArgumentList(SetLastCdr(GetArgumentList(), last_pair));
 }
 
-static void ReadObject(const u8 *source, enum ErrorCode *error) {
+static Object ReadObject(const u8 *source, enum ErrorCode *error) {
   *error = NO_ERROR;
-  SetReadSourceFromString(source, error);
-  if (*error) return;
+  Object string = AllocateString(source, error);
+  if (*error) return nil;
   s64 position = 0;
-  ReadFromSource(&position, error);
+  return ReadFromString(string, &position, error);
 }
 
 
@@ -688,75 +688,75 @@ void TestEvaluate() {
 
 #define BERT(bertscript...) #bertscript
 
-  ReadObject("'(hello world)", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  Object expression = ReadObject("'(hello world)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject("(define x 42)", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject("(define x 42)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject("(begin 1 2 3)", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject("(begin 1 2 3)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject("(begin (define x 42) x)", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject("(begin (define x 42) x)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject("(fn (x y z) z)", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject("(fn (x y z) z)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject("((fn (x y z) z) 1 2 3)", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject("((fn (x y z) z) 1 2 3)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject("((fn () 3))", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject("((fn () 3))", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject("(((fn (z) (fn () z)) 3))", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject("(((fn (z) (fn () z)) 3))", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject("+:binary", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject("+:binary", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject("(+:binary 720 360)", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject("(+:binary 720 360)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject("(-:binary (+:binary 720 360) 14)", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject("(-:binary (+:binary 720 360) 14)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject(BERT((-:binary "hello" 14)), &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject(BERT((-:binary "hello" 14)), &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject("(-:unary 14)", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject("(-:unary 14)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject("(+:binary 14 3e3)", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject("(+:binary 14 3e3)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject("(/:binary 14 0)", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject("(/:binary 14 0)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject("(/:binary 14 7)", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject("(/:binary 14 7)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject("(remainder 3 4)", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject("(remainder 3 4)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject(BERT(
+  expression = ReadObject(BERT(
         (begin
          (define pair
           (fn (left right)
@@ -766,18 +766,18 @@ void TestEvaluate() {
              pair)
             (allocate-pair))))
          (pair 3 4))), &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject("(list 1 2 3 4 5)", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject("(list 1 2 3 4 5)", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject("(evaluate '(+:binary 1 2))", &error);
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  expression = ReadObject("(evaluate '(+:binary 1 2))", &error);
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
 
-  ReadObject(BERT(
+  expression = ReadObject(BERT(
         (begin
          (define read-entire-file
           (fn (filename)
@@ -790,7 +790,7 @@ void TestEvaluate() {
             (open-binary-file-for-reading! filename))))
          (read-entire-file "evaluate.h"))), &error);
 
-  LOG_OP(LOG_TEST, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(GetExpression())));
+  LOG_OP(LOG_TEST, PrintlnObject(expression));
+  LOG_OP(LOG_TEST, PrintlnObject(EvaluateInAFreshEnvironment(expression)));
   DestroyMemory();
 }
