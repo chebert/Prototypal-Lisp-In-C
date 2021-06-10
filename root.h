@@ -27,6 +27,12 @@ enum Register {
   REGISTER_UNEVALUATED,
   REGISTER_CONTINUE,
 
+  // Registers for primitives
+  REGISTER_PRIMITIVE_A,
+  REGISTER_PRIMITIVE_B,
+  REGISTER_PRIMITIVE_C,
+  REGISTER_PRIMITIVE_D,
+
   // Total number of registers
   NUM_REGISTERS,
 };

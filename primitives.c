@@ -12,6 +12,8 @@
 #include "symbol_table.h"
 #include "vector.h"
 
+// TODO: Change primitives to continuation passing style?
+
 // Checks the error code and returns nil if there is an error.
 #define CHECK(error) do { if (*error) return nil; } while (0)
 
@@ -36,20 +38,6 @@ void Extract2Arguments(Object *arguments, Object *a, Object *b, enum ErrorCode *
 void Extract3Arguments(Object *arguments, Object *a, Object *b, Object *c, enum ErrorCode *error);
 // Sets the error code if arguments is not empty.
 void CheckEmptyArguments(Object arguments, enum ErrorCode *error);
-
-DECLARE_PRIMITIVE(PrimitiveUnarySubtract, arguments, error) {
-  Object a;
-  Extract1Argument(&arguments, &a, error);
-  CHECK(error);
-
-  if (IsFixnum(a))
-    return BoxFixnum(-UnboxFixnum(a));
-  else if (IsReal64(a))
-    return BoxReal64(-UnboxReal64(a));
-
-  *error = ERROR_EVALUATE_INVALID_ARGUMENT_TYPE;
-  return nil;
-}
 
 Object InvalidArgumentError(enum ErrorCode *error) {
   *error = ERROR_EVALUATE_INVALID_ARGUMENT_TYPE;
@@ -153,6 +141,20 @@ void Extract3Arguments(Object *arguments, Object *a, Object *b, Object *c, enum 
     PERFORM_BINARY_ARITHMETIC(a, b, operator, error); \
   } while (0)
 
+
+DECLARE_PRIMITIVE(PrimitiveUnarySubtract, arguments, error) {
+  Object a;
+  Extract1Argument(&arguments, &a, error);
+  CHECK(error);
+
+  if (IsFixnum(a))
+    return BoxFixnum(-UnboxFixnum(a));
+  else if (IsReal64(a))
+    return BoxReal64(-UnboxReal64(a));
+
+  *error = ERROR_EVALUATE_INVALID_ARGUMENT_TYPE;
+  return nil;
+}
 
 DECLARE_PRIMITIVE(PrimitiveBinaryAdd, arguments, error) {
   BINARY_ARITHMETIC_DEFINITION(+, arguments, error);
@@ -492,4 +494,18 @@ DECLARE_PRIMITIVE(PrimitiveVectorRef, arguments, error) {
 }
 
 DECLARE_PRIMITIVE(PrimitiveReadFromString, arguments, error) {
+  Object string, position, continuation;
+  Extract3Arguments(&arguments, &string, &position, &continuation, error);
+  CHECK(error);
+  if (!IsString(string)) return InvalidArgumentError(error);
+  if (!IsFixnum(position)) return InvalidArgumentError(error);
+  if (!IsProcedure(continuation)) return InvalidArgumentError(error);
+
+  s64 position_s64 = UnboxFixnum(position);
+  SetRegister(REGISTER_PRIMITIVE_A, continuation);
+  Object expression = ReadFromString(string, &position_s64, error);
+  SetRegister(PRIMITIVE_B, expression);
+
+  SetRegister(PRIMITIVE_C, AllocatePair(error));
+  SetCar(pair, BoxFixnum(position_s64));
 }
