@@ -492,20 +492,3 @@ DECLARE_PRIMITIVE(PrimitiveVectorRef, arguments, error) {
 
   return UnsafeVectorRef(vector, UnboxFixnum(index));
 }
-
-DECLARE_PRIMITIVE(PrimitiveReadFromString, arguments, error) {
-  Object string, position, continuation;
-  Extract3Arguments(&arguments, &string, &position, &continuation, error);
-  CHECK(error);
-  if (!IsString(string)) return InvalidArgumentError(error);
-  if (!IsFixnum(position)) return InvalidArgumentError(error);
-  if (!IsProcedure(continuation)) return InvalidArgumentError(error);
-
-  s64 position_s64 = UnboxFixnum(position);
-  SetRegister(REGISTER_PRIMITIVE_A, continuation);
-  Object expression = ReadFromString(string, &position_s64, error);
-  SetRegister(PRIMITIVE_B, expression);
-
-  SetRegister(PRIMITIVE_C, AllocatePair(error));
-  SetCar(pair, BoxFixnum(position_s64));
-}
