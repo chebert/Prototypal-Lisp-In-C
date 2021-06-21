@@ -77,6 +77,8 @@ void EvaluateIfDecide();
 void EvaluateAssignment1();
 void EvaluateDefinition1();
 
+void EvaluateUnboundVariable();
+
 void EvaluateUnknown();
 void EvaluateError();
 
@@ -99,6 +101,7 @@ static enum ErrorCode error = NO_ERROR;
 #define BRANCH(test, dest)  BEGIN  if (test) GOTO(dest);  END
 #define ERROR(error_code) BEGIN  error = error_code; GOTO(EvaluateError);  END
 #define CONTINUE GOTO(GetContinue())
+#define FINISH(value) BEGIN  SetValue(value); CONTINUE;  END
 
 #define CHECK(op)  BEGIN  (op); if (error) { GOTO(EvaluateError); }  END
 #define SAVE(reg)  BEGIN  CHECK(Save((reg), &error));  END
@@ -175,38 +178,29 @@ void EvaluateDispatch() {
 }
 
 void EvaluateSelfEvaluating() {
-  LOG(LOG_EVALUATE, "Self evaluating");
-  SetValue(GetExpression());
-  CONTINUE;
+  FINISH(GetExpression());
 }
 
 void EvaluateVariable() {
   b64 found = 0;
-  LOG(LOG_EVALUATE, "Looking up variable value in environment: ");
-  LOG_OP(LOG_EVALUATE, PrintlnObject(GetExpression()));
-  LOG_OP(LOG_EVALUATE, PrintlnObject(GetEnvironment()));
   Object value = LookupVariableValue(GetExpression(), GetEnvironment(), &found);
-  if (!found) {
-    LOG_ERROR("Could not find %s in environment", StringCharacterBuffer(GetExpression()));
-    ERROR(ERROR_EVALUATE_UNBOUND_VARIABLE);
-  }
+  BRANCH(!found, EvaluateUnboundVariable);
+  FINISH(value);
+}
 
-  SetValue(value);
-  CONTINUE;
+void EvaluateUnboundVariable() {
+  LOG_ERROR("Could not find %s in environment", StringCharacterBuffer(GetExpression()));
+  ERROR(ERROR_EVALUATE_UNBOUND_VARIABLE);
 }
 
 void EvaluateQuoted() {
-  LOG(LOG_EVALUATE, "Quoted expression");
   Object quoted_expression;
   CHECK(ExtractQuoted(GetExpression(), &quoted_expression, &error));
-
-  SetValue(quoted_expression);
-  CONTINUE;
+  FINISH(quoted_expression);
 }
 
 
 void EvaluateLambda() {
-  LOG(LOG_EVALUATE, "Lambda expression");
   Object parameters, body;
   CHECK(ExtractLambdaArguments(GetExpression(), &parameters, &body, &error));
 
@@ -214,12 +208,10 @@ void EvaluateLambda() {
   SetExpression(body);
   Object procedure;
   CHECK(procedure = MakeProcedure(&error));
-  SetValue(procedure);
-  CONTINUE;
+  FINISH(procedure);
 }
 
 void EvaluateApplication() {
-  LOG(LOG_EVALUATE, "Application");
   SAVE(REGISTER_CONTINUE);
   SAVE(REGISTER_ENVIRONMENT);
   SetUnevaluated(Operands(GetExpression()));
@@ -238,15 +230,14 @@ void EvaluateApplicationOperands() {
   SetProcedure(GetValue());
   SetArgumentList(EmptyArgumentList());
 
-  LOG(LOG_EVALUATE, "Evaluating operands");
+  // CASE: no operands
   BRANCH(HasNoOperands(GetUnevaluated()), EvaluateApplicationDispatch);
-
   // CASE: 1 or more operands
   SAVE(REGISTER_PROCEDURE);
   GOTO(EvaluateApplicationOperandLoop);
 }
+
 void EvaluateApplicationAccumulateArgument() {
-  LOG(LOG_EVALUATE, "Accumulating argument");
   Restore(REGISTER_UNEVALUATED);
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_ARGUMENT_LIST);
@@ -256,7 +247,6 @@ void EvaluateApplicationAccumulateArgument() {
 }
 
 void EvaluateApplicationAccumulateLastArgument() {
-  LOG(LOG_EVALUATE, "Accumulating last argument");
   Restore(REGISTER_ARGUMENT_LIST);
   CHECK(AdjoinArgument(&error));
   Restore(REGISTER_PROCEDURE);
@@ -264,7 +254,6 @@ void EvaluateApplicationAccumulateLastArgument() {
 }
 
 void EvaluateApplicationOperandLoop() {
-  LOG(LOG_EVALUATE, "Evaluating next operand");
   // Evaluate operands
   SAVE(REGISTER_ARGUMENT_LIST);
 
@@ -272,12 +261,10 @@ void EvaluateApplicationOperandLoop() {
 
   // CASE: Last argument
   if (IsLastOperand(GetUnevaluated())) {
-    LOG(LOG_EVALUATE, "last operand");
     SetContinue(EvaluateApplicationAccumulateLastArgument);
     GOTO(EvaluateDispatch);
   } else if (IsPair(GetUnevaluated())) {
     // CASE: 2+ arguments
-    LOG(LOG_EVALUATE, "not the last operand");
     SAVE(REGISTER_ENVIRONMENT);
     SAVE(REGISTER_UNEVALUATED);
     SetContinue(EvaluateApplicationAccumulateArgument);
@@ -289,7 +276,6 @@ void EvaluateApplicationOperandLoop() {
 }
 
 void EvaluateApplicationDispatch() {
-  LOG(LOG_EVALUATE, "Evaluate application: dispatch based on primitive/compound procedure");
   Object proc = GetProcedure();
   if (IsPrimitiveProcedure(proc)) {
     // Primitive-procedure application
@@ -300,7 +286,6 @@ void EvaluateApplicationDispatch() {
     // Compound-procedure application
     SetUnevaluated(ProcedureParameters(proc));
     SetEnvironment(ProcedureEnvironment(proc));
-    LOG(LOG_EVALUATE, "Extending the environment");
     CHECK(ExtendEnvironment(&error));
 
     proc = GetProcedure();
@@ -312,7 +297,6 @@ void EvaluateApplicationDispatch() {
 }
 
 void EvaluateBegin() {
-  LOG(LOG_EVALUATE, "Evaluate begin");
   Object sequence;
   CHECK(ExtractBegin(GetExpression(), &sequence, &error));
 
@@ -322,7 +306,6 @@ void EvaluateBegin() {
 }
 
 void EvaluateSequenceContinue() {
-  LOG(LOG_EVALUATE, "Evaluate next expression in sequence");
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_UNEVALUATED);
 
@@ -330,16 +313,12 @@ void EvaluateSequenceContinue() {
   GOTO(EvaluateSequence);
 }
 void EvaluateSequenceLastExpression() {
-  LOG(LOG_EVALUATE, "Evaluate sequence, last expression");
   Restore(REGISTER_CONTINUE);
   GOTO(EvaluateDispatch);
 }
 
 void EvaluateSequence() {
-  LOG(LOG_EVALUATE, "Evaluate sequence");
   Object unevaluated = GetUnevaluated();
-  LOG_OP(LOG_EVALUATE, PrintlnObject(unevaluated));
-
   if (IsPair(unevaluated)) {
     SetExpression(FirstExpression(unevaluated));
 
@@ -359,7 +338,6 @@ void EvaluateSequence() {
 
 
 void EvaluateIfDecide() {
-  LOG(LOG_EVALUATE, "Evaluate if, condition already evaluated");
   Restore(REGISTER_CONTINUE);
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_EXPRESSION);
@@ -372,7 +350,6 @@ void EvaluateIfDecide() {
 }
 
 void EvaluateIf() {
-  LOG(LOG_EVALUATE, "Evaluate if");
   SAVE(REGISTER_EXPRESSION);
   SAVE(REGISTER_ENVIRONMENT);
   SAVE(REGISTER_CONTINUE);
@@ -387,21 +364,17 @@ void EvaluateIf() {
 
 
 void EvaluateAssignment1() {
-  LOG(LOG_EVALUATE, "Evaluate assignment, value already evaluated");
   Restore(REGISTER_CONTINUE);
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_UNEVALUATED);
 
   CHECK(SetVariableValue(GetUnevaluated(), GetValue(), GetEnvironment(), &error));
   // Return the symbol 'ok as the result of an assignment
-  SetValue(FindSymbol("ok"));
-  CONTINUE;
+  FINISH(FindSymbol("ok"));
 }
 
 
 void EvaluateAssignment() {
-  LOG(LOG_EVALUATE, "Evaluate assignment");
-
   Object variable, value;
   CHECK(ExtractAssignmentArguments(GetExpression(), &variable, &value, &error));
 
@@ -420,8 +393,7 @@ void EvaluateDefinition1() {
   Restore(REGISTER_UNEVALUATED);
   CHECK(DefineVariable(&error));
   // Return the symbol name as the result of the definition.
-  SetValue(GetUnevaluated());
-  CONTINUE;
+  FINISH(GetUnevaluated());
 }
 
 void EvaluateDefinition() {
@@ -454,9 +426,6 @@ void EvaluateError() {
 }
 
 Object ApplyPrimitiveProcedure(Object procedure, Object arguments, enum ErrorCode *error) { 
-  LOG(LOG_EVALUATE, "applying primitive function");
-  LOG_OP(LOG_EVALUATE, PrintlnObject(procedure));
-  LOG_OP(LOG_EVALUATE, PrintlnObject(arguments));
   PrimitiveFunction function = UnboxPrimitiveProcedure(procedure);
   return function(arguments, error);
 }
