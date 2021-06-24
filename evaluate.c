@@ -206,8 +206,14 @@ void EvaluateLambda() {
 
   SetUnevaluated(parameters);
   SetExpression(body);
+  
   Object procedure;
-  CHECK(procedure = MakeProcedure(&error));
+  CHECK(procedure = AllocateCompoundProcedure(error));
+
+  SetProcedureEnvironment(procedure, GetEnvironment());
+  SetProcedureParameters(procedure, GetUnevaluated());
+  SetProcedureBody(procedure, GetExpression());
+
   FINISH(procedure);
 }
 
@@ -216,17 +222,21 @@ void EvaluateApplication() {
   SAVE(REGISTER_ENVIRONMENT);
   SetUnevaluated(Operands(GetExpression()));
   SAVE(REGISTER_UNEVALUATED);
-  // Evaluate the operator
+  // First: Evaluate the operator
   SetExpression(Operator(GetExpression()));
+  // Continue by evaluating the operands
   SetContinue(EvaluateApplicationOperands);
+  // Evaluate the operator
   GOTO(EvaluateDispatch);
 }
 
 void EvaluateApplicationOperands() {
+  // FROM: EvaluateApplication
   // operator has been evaluated.
   Restore(REGISTER_UNEVALUATED);
   Restore(REGISTER_ENVIRONMENT);
 
+  // Save the evaluated procedure.
   SetProcedure(GetValue());
   SetArgumentList(EmptyArgumentList());
 
@@ -238,6 +248,7 @@ void EvaluateApplicationOperands() {
 }
 
 void EvaluateApplicationAccumulateArgument() {
+  // FROM: EvaluateApplicationOperandLoop
   Restore(REGISTER_UNEVALUATED);
   Restore(REGISTER_ENVIRONMENT);
   Restore(REGISTER_ARGUMENT_LIST);
@@ -254,6 +265,7 @@ void EvaluateApplicationAccumulateLastArgument() {
 }
 
 void EvaluateApplicationOperandLoop() {
+  // FROM: EvaluateApplicationAccumulateArgument or EvaluateApplicationOperands
   // Evaluate operands
   SAVE(REGISTER_ARGUMENT_LIST);
 
@@ -398,7 +410,6 @@ void EvaluateDefinition1() {
 
 void EvaluateDefinition() {
   // (define name value)
-
   Object variable, value;
   CHECK(ExtractDefinitionArguments(GetExpression(), &variable, &value, &error));
 
@@ -428,17 +439,6 @@ void EvaluateError() {
 Object ApplyPrimitiveProcedure(Object procedure, Object arguments, enum ErrorCode *error) { 
   PrimitiveFunction function = UnboxPrimitiveProcedure(procedure);
   return function(arguments, error);
-}
-
-
-Object MakeProcedure(enum ErrorCode *error) {
-  Object procedure = AllocateCompoundProcedure(error);
-  if (*error) return nil;
-
-  SetProcedureEnvironment(procedure, GetEnvironment());
-  SetProcedureParameters(procedure, GetUnevaluated());
-  SetProcedureBody(procedure, GetExpression());
-  return procedure;
 }
 
 void AdjoinArgument(enum ErrorCode *error) {
