@@ -28,6 +28,7 @@ enum Register {
   REGISTER_CONTINUE,
 
   // Registers for primitives
+  // TODO: check if needed/consolidate
   REGISTER_PRIMITIVE_A,
   REGISTER_PRIMITIVE_B,
   REGISTER_PRIMITIVE_C,

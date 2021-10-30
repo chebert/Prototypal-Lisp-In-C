@@ -6,9 +6,9 @@
 
 // Memory is managed using a stop-and-copy garbage collection algorithm.
 //
-// Root references the live objects in the system. Anything not reachable from the root is considered garbage.
+// The root references the live objects in the system. Anything not reachable from the root is considered garbage.
 // Memory consists of two regions:
-//   the_objects: a mixture the current (live) objects and discared (garbage) objects in the system.
+//   the_objects: a mixture the current (live) objects and discarded (garbage) objects in the system.
 //   new_objects: during GC, live/reachable objects are moved from the_objects into new_objects.
 //      when complete, the new_objects and the_objects are swapped
 //

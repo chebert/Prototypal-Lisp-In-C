@@ -208,7 +208,7 @@ void EvaluateLambda() {
   SetExpression(body);
   
   Object procedure;
-  CHECK(procedure = AllocateCompoundProcedure(error));
+  CHECK(procedure = AllocateCompoundProcedure(&error));
 
   SetProcedureEnvironment(procedure, GetEnvironment());
   SetProcedureParameters(procedure, GetUnevaluated());
